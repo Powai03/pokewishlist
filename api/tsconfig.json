@@ -1,0 +1,19 @@
+{
+  // Configuration TypeScript de l'API (vérification : `npm run typecheck`, sources + tests).
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext", // modules ES de Node.js (imports avec extension .js)
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true, // typage strict : pas de `any` implicite, null vérifié…
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true, // impose `import type` pour les imports de types
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

@@ -26,5 +26,17 @@ export default withNuxt({
       ],
     },
   })
+  // API (Hono) : mêmes exigences de typage ; console.info autorisé (message de démarrage du serveur).
+  .append({
+    files: ['api/src/**/*.ts'],
+    rules: {
+      'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
+      '@typescript-eslint/explicit-module-boundary-types': 'error',
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        { allowExpressions: true, allowTypedFunctionExpressions: true },
+      ],
+    },
+  })
   // En dernier : désactive toutes les règles ESLint de mise en forme qui contrediraient Prettier.
   .append(prettier)
