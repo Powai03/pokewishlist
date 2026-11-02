@@ -12,7 +12,15 @@ export interface AppConfig {
   env: AppEnv
   /** Port d'écoute HTTP, lu dans PORT (3002 par défaut). */
   port: number
+  /** Origines (sites) autorisées à appeler l'API depuis un navigateur, lues dans CORS_ORIGIN. */
+  corsOrigins: string[]
 }
+
+/** Origines autorisées par défaut : le front Nuxt en local (ports 3000 et 3001). */
+export const DEFAULT_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+]
 
 /** Lit la version dans api/package.json (fonctionne depuis src/ avec tsx comme depuis dist/ après build). */
 export function readVersion(): string {
@@ -42,10 +50,20 @@ export function parsePort(value: string | undefined): number {
   return Number.isInteger(port) && port > 0 && port < 65536 ? port : 3002
 }
 
+/** CORS_ORIGIN : liste d'origines séparées par des virgules (« http://a.fr,http://b.fr »). */
+export function parseCorsOrigins(value: string | undefined): string[] {
+  const origins = (value ?? '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean)
+  return origins.length ? origins : DEFAULT_CORS_ORIGINS
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     version: readVersion(),
     env: parseEnv(env.NODE_ENV),
     port: parsePort(env.PORT),
+    corsOrigins: parseCorsOrigins(env.CORS_ORIGIN),
   }
 }

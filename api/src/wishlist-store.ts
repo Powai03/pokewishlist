@@ -10,12 +10,20 @@ export const GEN5 = { first: 494, last: 649 } as const
 /** Taille maximale de la wishlist : 6 Pokémon, comme une équipe dans le jeu. */
 export const WISHLIST_MAX = 6
 
-/** Ce que le client envoie dans POST /wishlist. */
+/** Ce que le client envoie dans POST /wishlist : le Pokémon tel que le front le connaît (via PokéAPI). */
 export interface WishlistInput {
   /** Numéro du Pokédex national (494 à 649). */
   id: number
-  /** Nom du Pokémon (ex. « Vipélierre »). */
+  /** Nom (anglais côté front, ex. « snivy »). */
   name: string
+  /** Nom français (ex. « Vipélierre ») ; vaut `name` s'il n'est pas fourni. */
+  frName: string
+  /** Adresse du sprite animé, ou null. */
+  sprite: string | null
+  /** Adresse de l'icône de menu, ou null. */
+  icon: string | null
+  /** Types élémentaires (ex. ['grass']), 2 au maximum. */
+  types: string[]
 }
 
 /** Un Pokémon enregistré dans la wishlist. */
@@ -37,31 +45,96 @@ export function isGen5(id: number): boolean {
   return Number.isInteger(id) && id >= GEN5.first && id <= GEN5.last
 }
 
+const isShortText = (value: unknown, max: number): value is string =>
+  typeof value === 'string' && value.trim() !== '' && value.length <= max
+
+/** Champ optionnel « adresse d'image » : absent/null → null ; sinon une URL http(s) raisonnable. */
+function optionalUrl(value: unknown): Validation<string | null> {
+  if (value === undefined || value === null) return { ok: true, value: null }
+  if (
+    typeof value === 'string' &&
+    value.length <= 500 &&
+    /^https?:\/\//.test(value)
+  ) {
+    return { ok: true, value }
+  }
+  return { ok: false, error: 'doit être une adresse http(s) ou null' }
+}
+
 /**
  * Vérifie le corps de POST /wishlist, qui arrive en `unknown` (le client peut envoyer n'importe quoi).
- * Attendu : { id: entier de 494 à 649, name: texte non vide (50 caractères max) }.
+ * Obligatoires : id (entier 494–649), name (texte). Optionnels : frName, sprite, icon, types.
  */
 export function validateInput(body: unknown): Validation<WishlistInput> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return { ok: false, error: 'Le corps doit être un objet JSON' }
   }
-  const { id, name } = body as Record<string, unknown>
-  if (typeof id !== 'number' || !Number.isInteger(id)) {
+  const b = body as Record<string, unknown>
+  if (typeof b.id !== 'number' || !Number.isInteger(b.id)) {
     return { ok: false, error: '« id » doit être un nombre entier' }
   }
-  if (!isGen5(id)) {
+  if (!isGen5(b.id)) {
     return {
       ok: false,
       error: `« id » doit être un Pokémon de 5e génération (${GEN5.first} à ${GEN5.last})`,
     }
   }
-  if (typeof name !== 'string' || name.trim() === '') {
+  if (typeof b.name !== 'string' || b.name.trim() === '') {
     return { ok: false, error: '« name » doit être un texte non vide' }
   }
-  if (name.trim().length > 50) {
+  if (b.name.trim().length > 50) {
     return { ok: false, error: '« name » ne doit pas dépasser 50 caractères' }
   }
-  return { ok: true, value: { id, name: name.trim() } }
+  if (b.frName !== undefined && !isShortText(b.frName, 50)) {
+    return {
+      ok: false,
+      error: '« frName » doit être un texte de 1 à 50 caractères',
+    }
+  }
+  const sprite = optionalUrl(b.sprite)
+  if (!sprite.ok) return { ok: false, error: `« sprite » ${sprite.error}` }
+  const icon = optionalUrl(b.icon)
+  if (!icon.ok) return { ok: false, error: `« icon » ${icon.error}` }
+  const types = b.types ?? []
+  if (
+    !Array.isArray(types) ||
+    types.length > 2 ||
+    !types.every((t) => isShortText(t, 20))
+  ) {
+    return {
+      ok: false,
+      error: '« types » doit être une liste de 2 textes au plus',
+    }
+  }
+  const name = b.name.trim()
+  return {
+    ok: true,
+    value: {
+      id: b.id,
+      name,
+      frName: typeof b.frName === 'string' ? b.frName.trim() : name,
+      sprite: sprite.value,
+      icon: icon.value,
+      types: types as string[],
+    },
+  }
+}
+
+/** Vérifie le corps de PATCH /wishlist/:id : { captured: boolean }. */
+export function validatePatch(
+  body: unknown,
+): Validation<{ captured: boolean }> {
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    typeof (body as Record<string, unknown>).captured === 'boolean'
+  ) {
+    return {
+      ok: true,
+      value: { captured: (body as { captured: boolean }).captured },
+    }
+  }
+  return { ok: false, error: '« captured » doit être true ou false' }
 }
 
 export class WishlistStore {
@@ -88,6 +161,13 @@ export class WishlistStore {
     }
     this.items.push(item)
     return { ok: true, item }
+  }
+
+  /** Marque un Pokémon capturé ou non ; renvoie l'élément modifié, ou `undefined` s'il n'est pas là. */
+  setCaptured(id: number, captured: boolean): WishlistItem | undefined {
+    const item = this.get(id)
+    if (item) item.captured = captured
+    return item
   }
 
   /** Retire un Pokémon ; renvoie l'élément retiré, ou `undefined` s'il n'était pas là. */

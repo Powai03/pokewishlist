@@ -25,7 +25,7 @@ export function isGen5(id: number): boolean {
 }
 
 /**
- * Garde de type : vérifie qu'un texte venu de l'extérieur (API, localStorage) est bien un des 18 types.
+ * Garde de type : vérifie qu'un texte venu de l'extérieur (PokéAPI, API Hono) est bien un des 18 types.
  * Si elle renvoie `true`, TypeScript sait ensuite que `value` est un `PokemonType`.
  */
 export function isPokemonType(value: unknown): value is PokemonType {

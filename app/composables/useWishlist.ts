@@ -1,58 +1,100 @@
-// État partagé de la wishlist + sauvegarde automatique dans le localStorage
-// (la lecture/écriture elle-même est dans app/utils/storage.ts, testée à part).
+// État partagé de la wishlist, synchronisé avec l'API Hono (plus de localStorage).
+// Principe : chaque action appelle l'API d'abord ; l'écran n'est mis à jour qu'avec SA réponse.
+// Ainsi, ce qui est affiché correspond toujours à ce que le serveur a réellement enregistré.
 import type { ComputedRef, Ref } from 'vue'
 import type { Pokemon, WishlistItem, WishlistStats } from '~/types/pokemon'
 
 /** Ce que renvoie `useWishlist()` : l'état de la liste et les actions possibles. */
 export interface UseWishlist {
   list: Ref<WishlistItem[]>
+  /** `true` une fois la liste chargée depuis l'API (avec succès ou non). */
   ready: Ref<boolean>
+  /** Dernier message d'erreur de l'API (injoignable, 409…), ou `null`. */
+  error: Ref<string | null>
   stats: ComputedRef<WishlistStats>
   /** `true` quand la wishlist contient déjà WISHLIST_MAX (6) Pokémon. */
   full: ComputedRef<boolean>
   has: (id: number) => boolean
-  add: (pokemon: Pokemon) => void
-  remove: (id: number) => void
-  toggle: (id: number) => void
+  /** Ajoute via POST /wishlist ; renvoie `true` si l'API l'a accepté. */
+  add: (pokemon: Pokemon) => Promise<boolean>
+  /** Retire via DELETE /wishlist/:id. */
+  remove: (id: number) => Promise<void>
+  /** Bascule « capturé » via PATCH /wishlist/:id. */
+  toggle: (id: number) => Promise<void>
+  /** Recharge la liste via GET /wishlist. */
+  reload: () => Promise<void>
 }
 
 export function useWishlist(): UseWishlist {
   const list = useState<WishlistItem[]>('wishlist', () => [])
-  // `ready` passe à true une fois la liste relue : évite d'afficher « liste vide » le temps du chargement.
   const ready = useState<boolean>('wishlist-ready', () => false)
+  const error = useState<string | null>('wishlist-error', () => null)
+  const apiBase = useRuntimeConfig().public.apiBase
 
-  // Le localStorage n'existe que dans le navigateur : on le lit après le montage, jamais côté serveur.
-  onMounted(() => {
-    if (ready.value) return
-    const storage = getBrowserStorage()
-    list.value = storage ? loadWishlist(storage) : [] // ne lève jamais, même si le JSON est corrompu
+  /** Message lisible pour une erreur d'appel à l'API. */
+  const messageOf = (e: unknown): string =>
+    e instanceof WishlistApiError ? e.message : "Erreur inattendue de l'API"
+
+  /** Exécute un appel à l'API ; en cas d'échec, garde le message pour l'afficher. */
+  async function call<T>(action: () => Promise<T>): Promise<T | undefined> {
+    error.value = null
+    try {
+      return await action()
+    } catch (e: unknown) {
+      error.value = messageOf(e)
+      return undefined
+    }
+  }
+
+  async function reload(): Promise<void> {
+    const items = await call(() => fetchWishlist(apiBase))
+    if (items) list.value = items
     ready.value = true
+  }
+
+  // Chargement initial, côté navigateur uniquement (une seule fois pour toute l'appli).
+  onMounted(() => {
+    if (!ready.value) void reload()
   })
 
-  watch(
-    list,
-    (value: WishlistItem[]): void => {
-      if (!ready.value) return
-      const storage = getBrowserStorage()
-      if (storage) saveWishlist(value, storage) // si ça échoue, la liste reste en mémoire
-    },
-    { deep: true },
-  )
+  async function add(pokemon: Pokemon): Promise<boolean> {
+    const item = await call(() => postWishlistItem(apiBase, pokemon))
+    if (!item) return false
+    list.value = addPokemon(list.value, item, item.captured)
+    return true
+  }
+
+  async function remove(id: number): Promise<void> {
+    error.value = null
+    try {
+      await deleteWishlistItem(apiBase, id)
+    } catch (e: unknown) {
+      // 404 : déjà absent côté serveur → on le retire aussi de l'écran ; sinon on affiche l'erreur.
+      if (!(e instanceof WishlistApiError && e.status === 404)) {
+        error.value = messageOf(e)
+        return
+      }
+    }
+    list.value = removePokemon(list.value, id)
+  }
+
+  async function toggle(id: number): Promise<void> {
+    const current = list.value.find((p) => p.id === id)
+    if (!current) return
+    const item = await call(() => patchCaptured(apiBase, id, !current.captured))
+    if (item) list.value = list.value.map((p) => (p.id === id ? item : p))
+  }
 
   return {
     list,
     ready,
+    error,
     stats: computed(() => progress(list.value)),
     full: computed(() => isFull(list.value)),
     has: (id: number) => list.value.some((p) => p.id === id),
-    add: (pokemon: Pokemon) => {
-      list.value = addPokemon(list.value, pokemon)
-    },
-    remove: (id: number) => {
-      list.value = removePokemon(list.value, id)
-    },
-    toggle: (id: number) => {
-      list.value = toggleCaptured(list.value, id)
-    },
+    add,
+    remove,
+    toggle,
+    reload,
   }
 }

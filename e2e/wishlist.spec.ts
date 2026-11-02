@@ -1,6 +1,13 @@
-import { expect, test, type Page } from '@playwright/test'
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from '@playwright/test'
+import { API_URL } from '../playwright.config'
 
-// Fausses réponses PokéAPI : le test ne dépend ni du réseau ni de la disponibilité de l'API.
+// Fausses réponses PokéAPI : le test ne dépend ni du réseau ni de la disponibilité de PokéAPI.
+// L'API Hono, elle, est la VRAIE (démarrée par playwright.config.ts).
 const GRAPHQL_INDEX = {
   data: {
     species: [
@@ -51,49 +58,104 @@ async function mockPokeApi(page: Page) {
   })
 }
 
-test.beforeEach(async ({ page }) => {
+/** Vide la wishlist de l'API (stockée en mémoire, partagée entre les tests). */
+async function resetApi(request: APIRequestContext): Promise<void> {
+  const items = (await (await request.get(`${API_URL}/wishlist`)).json()) as {
+    id: number
+  }[]
+  for (const item of items)
+    await request.delete(`${API_URL}/wishlist/${item.id}`)
+}
+
+/** Ce que l'API contient réellement (lu directement, sans passer par le front). */
+async function apiWishlist(
+  request: APIRequestContext,
+): Promise<{ id: number; frName: string; captured: boolean }[]> {
+  return (await (await request.get(`${API_URL}/wishlist`)).json()) as {
+    id: number
+    frName: string
+    captured: boolean
+  }[]
+}
+
+test.beforeEach(async ({ page, request }) => {
+  await resetApi(request)
   await mockPokeApi(page)
   await page.goto('/')
 })
 
-test('ajouter un Pokémon puis rafraîchir : il reste dans la liste', async ({
+// ── Front → API : ce qu'on fait dans Nuxt est enregistré par l'API ────────────
+test("ajouter un Pokémon depuis Nuxt : il apparaît dans l'API (GET /wishlist)", async ({
   page,
+  request,
 }) => {
   await expect(page.getByText('Ta boîte est vide')).toBeVisible()
+  expect(await apiWishlist(request)).toEqual([]) // l'API est vide au départ
 
-  // 1. Rechercher (en français, sans accent) et ajouter Vipélierre
+  // 1. Dans le front : rechercher et ajouter Vipélierre
   await page.getByLabel('Nom ou numéro').fill('vipe')
   await page.getByRole('button', { name: /Vipélierre/ }).click()
-
-  const card = page.getByTestId('card-495')
-  await expect(card).toBeVisible()
-  await expect(card).toContainText('Vipélierre')
-  await expect(page.getByTestId('scene')).toContainText('Plante') // affiché sur l'écran du haut
-
-  // 2. Rafraîchir la page : la liste doit être relue depuis le localStorage
-  await page.reload()
   await expect(page.getByTestId('card-495')).toBeVisible()
+
+  // 2. Dans l'API, appelée directement : le Pokémon y est, avec les données envoyées par le front
+  await expect
+    .poll(async () => (await apiWishlist(request)).map((p) => p.id))
+    .toEqual([495])
+  expect((await apiWishlist(request))[0]).toMatchObject({
+    id: 495,
+    frName: 'Vipélierre',
+    captured: false,
+  })
+})
+
+// ── API → front : ce que l'API contient est affiché par Nuxt ──────────────────
+test('un Pokémon ajouté directement dans l’API s’affiche dans Nuxt', async ({
+  page,
+  request,
+}) => {
+  const res = await request.post(`${API_URL}/wishlist`, {
+    data: { id: 498, name: 'tepig', frName: 'Gruikui', types: ['fire'] },
+  })
+  expect(res.status()).toBe(201)
+
+  await page.reload()
+
+  await expect(page.getByTestId('card-498')).toContainText('Gruikui')
+  await expect(page.getByTestId('scene')).toContainText('Feu')
+})
+
+test('ajouter puis rafraîchir : le Pokémon est relu depuis l’API', async ({
+  page,
+}) => {
+  await page.getByLabel('Nom ou numéro').fill('vipe')
+  await page.getByRole('button', { name: /Vipélierre/ }).click()
+  await expect(page.getByTestId('card-495')).toBeVisible()
+
+  await page.reload()
+
   await expect(page.getByTestId('card-495')).toContainText('Vipélierre')
   await expect(page.getByText('Ta boîte est vide')).toHaveCount(0)
 })
 
-test('supprimer un Pokémon : il ne revient pas après rafraîchissement', async ({
+test('supprimer depuis Nuxt : DELETE envoyé, le Pokémon disparaît de l’API', async ({
   page,
+  request,
 }) => {
   await page.getByLabel('Nom ou numéro').fill('498')
   await page.getByRole('button', { name: /Gruikui/ }).click()
   await expect(page.getByTestId('card-498')).toBeVisible()
 
   await page.getByRole('button', { name: 'Retirer Gruikui' }).click()
-  await expect(page.getByTestId('card-498')).toHaveCount(0)
 
+  await expect(page.getByTestId('card-498')).toHaveCount(0)
+  await expect.poll(async () => apiWishlist(request)).toEqual([])
   await page.reload()
   await expect(page.getByText('Ta boîte est vide')).toBeVisible()
-  await expect(page.getByTestId('card-498')).toHaveCount(0)
 })
 
-test('la capture est sauvegardée et met à jour la progression', async ({
+test('capturer depuis Nuxt : PATCH envoyé, l’état est enregistré par l’API', async ({
   page,
+  request,
 }) => {
   await page.getByLabel('Nom ou numéro').fill('moustillon')
   await page.keyboard.press('Enter') // Entrée ajoute le premier résultat
@@ -101,76 +163,30 @@ test('la capture est sauvegardée et met à jour la progression', async ({
   await expect(page.getByTestId('progress')).toHaveText('0/1')
 
   await page.getByRole('button', { name: 'Capturer' }).click()
-  await expect(page.getByTestId('progress')).toHaveText('1/1')
 
-  await page.reload()
   await expect(page.getByTestId('progress')).toHaveText('1/1')
+  await expect
+    .poll(async () => (await apiWishlist(request))[0]?.captured)
+    .toBe(true)
+  await page.reload()
   await expect(page.getByRole('button', { name: 'Relâcher' })).toBeVisible()
 })
 
-// ── localStorage corrompu : l'application ne doit jamais planter ──────────────
-test.describe('localStorage corrompu', () => {
-  // Écrit `raw` à la place de la sauvegarde, puis recharge la page pour que l'appli le relise.
-  async function corruptStorageAndReload(
-    page: Page,
-    raw: string,
-  ): Promise<void> {
-    await page.evaluate(
-      (value) => localStorage.setItem('pokewishlist', value),
-      raw,
-    )
-    await page.reload()
-  }
+// ── Robustesse : l'API ne répond pas ──────────────────────────────────────────
+test("API injoignable : message d'erreur, l'application ne plante pas", async ({
+  page,
+}) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  // Simule une API arrêtée : la connexion est refusée.
+  await page.route(`${API_URL}/**`, (route) => route.abort('connectionrefused'))
 
-  test("un JSON corrompu ne fait pas planter l'application", async ({
-    page,
-  }) => {
-    // Toute erreur JavaScript non rattrapée dans la page est enregistrée ici.
-    const pageErrors: string[] = []
-    page.on('pageerror', (error) => pageErrors.push(error.message))
+  await page.reload()
 
-    await corruptStorageAndReload(page, '{"id":495,"name":"sni') // sauvegarde coupée au milieu
-
-    // 1. L'appli s'affiche normalement, avec une boîte vide (pas d'écran d'erreur)
-    await expect(page.getByText('Ta boîte est vide')).toBeVisible()
-    await expect(page.getByLabel('Nom ou numéro')).toBeEnabled()
-
-    // 2. Elle reste utilisable : on peut ajouter un Pokémon…
-    await page.getByLabel('Nom ou numéro').fill('vipe')
-    await page.getByRole('button', { name: /Vipélierre/ }).click()
-    await expect(page.getByTestId('card-495')).toBeVisible()
-
-    // 3. … et la nouvelle sauvegarde, valide, remplace la sauvegarde corrompue
-    await page.reload()
-    await expect(page.getByTestId('card-495')).toBeVisible()
-    expect(
-      await page.evaluate(() =>
-        JSON.parse(localStorage.getItem('pokewishlist') ?? 'null'),
-      ),
-    ).toHaveLength(1)
-
-    // 4. Aucune erreur JavaScript pendant tout le scénario
-    expect(pageErrors).toEqual([])
-  })
-
-  test('sauvegarde en partie abîmée : seuls les Pokémon valides s’affichent', async ({
-    page,
-  }) => {
-    const pageErrors: string[] = []
-    page.on('pageerror', (error) => pageErrors.push(error.message))
-
-    await corruptStorageAndReload(
-      page,
-      JSON.stringify([
-        { id: 495, name: 'snivy', frName: 'Vipélierre', types: ['grass'] },
-        null,
-        { id: 'x', name: 'zorua' },
-        { id: 25, name: 'pikachu', frName: 'Pikachu' }, // hors 5e génération
-      ]),
-    )
-
-    await expect(page.getByTestId('card-495')).toBeVisible()
-    await expect(page.locator('[data-testid^="card-"]')).toHaveCount(1)
-    expect(pageErrors).toEqual([])
-  })
+  await expect(page.getByTestId('api-error')).toContainText(
+    "L'API ne répond pas",
+  )
+  await expect(page.getByText('Ta boîte est vide')).toBeVisible()
+  await expect(page.getByLabel('Nom ou numéro')).toBeEnabled()
+  expect(pageErrors).toEqual([])
 })

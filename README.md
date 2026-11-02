@@ -106,16 +106,30 @@ Variables d'environnement : `PORT` (3002 par défaut), `NODE_ENV` (`development`
 
 ### Routes
 
-| Méthode  | Route           | Succès                                    | Erreurs                                             |
-| -------- | --------------- | ----------------------------------------- | --------------------------------------------------- |
-| `GET`    | `/health`       | `200` état, version, environnement        |                                                     |
-| `GET`    | `/wishlist`     | `200` liste des Pokémon                   |                                                     |
-| `POST`   | `/wishlist`     | `201` Pokémon créé (+ en-tête `Location`) | `400` corps invalide, `409` doublon ou liste pleine |
-| `DELETE` | `/wishlist/:id` | `200` Pokémon retiré                      | `400` id invalide, `404` absent de la liste         |
+| Méthode  | Route           | Succès                                         | Erreurs                                             |
+| -------- | --------------- | ---------------------------------------------- | --------------------------------------------------- |
+| `GET`    | `/health`       | `200` état, version, environnement             |                                                     |
+| `GET`    | `/wishlist`     | `200` liste des Pokémon                        |                                                     |
+| `POST`   | `/wishlist`     | `201` Pokémon créé (+ en-tête `Location`)      | `400` corps invalide, `409` doublon ou liste pleine |
+| `PATCH`  | `/wishlist/:id` | `200` Pokémon modifié (`{ "captured": true }`) | `400` corps invalide, `404` absent de la liste      |
+| `DELETE` | `/wishlist/:id` | `200` Pokémon retiré                           | `400` id invalide, `404` absent de la liste         |
 
 Corps de `POST /wishlist` : `{ "id": 495, "name": "Vipélierre" }` (5e génération : 494 à 649, 6 Pokémon maximum).
 
 La wishlist est stockée **en mémoire** : elle est vidée à chaque redémarrage de l'API.
+
+Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des virgules ; défaut : `http://localhost:3000,http://localhost:3001`).
+
+## Lancer le front avec l'API
+
+Le front lit et enregistre la wishlist via l'API (plus de localStorage). Dans deux terminaux :
+
+```bash
+cd api && npm run dev     # API sur http://localhost:3002
+npm run dev               # front sur http://localhost:3000
+```
+
+Adresse de l'API côté front : `NUXT_PUBLIC_API_BASE` (défaut `http://localhost:3002`).
 
 ```bash
 curl -X POST localhost:3002/wishlist -H 'content-type: application/json' -d '{"id":495,"name":"Vipélierre"}'
