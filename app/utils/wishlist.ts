@@ -71,7 +71,6 @@ export function searchSpecies(entries: SpeciesEntry[], input: string, limit = 8)
 
 /** Ajoute un Pokémon de 5e génération s'il n'y est pas déjà ; la liste reste triée par numéro. */
 export function addPokemon(list: Pokemon[], pokemon: Pokemon): Pokemon[] {
-  console.log('ajout', pokemon.id)
   if (!isGen5(pokemon.id) || list.some(p => p.id === pokemon.id)) return list
   return [...list, pokemon].sort((a, b) => a.id - b.id)
 }
