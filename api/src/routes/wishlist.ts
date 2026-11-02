@@ -33,6 +33,7 @@ export function wishlistRoutes(store: WishlistStore): Hono {
     if (!input.ok) return c.json<ErrorResponse>({ error: input.error }, 400)
 
     // 3. Ajouter : 409 (conflit) si déjà présent ou si la liste est pleine.
+    console.log('ajout', input.value)
     const result = store.add(input.value)
     if (!result.ok) {
       const error =
