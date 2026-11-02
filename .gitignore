@@ -25,3 +25,8 @@ logs
 
 # Notes perso (non versionnées)
 /EXPLICATIONS.md
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
