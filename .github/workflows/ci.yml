@@ -11,14 +11,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 4 jobs indépendants = 4 « checks » distincts visibles sur la PR.
+  # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ le job e2e plus bas).
   check:
     name: ${{ matrix.task }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false # un check rouge n'arrête pas les autres
       matrix:
-        task: [lint, typecheck, test, build]
+        task: [lint, format:check, typecheck, test, build]
     steps:
       - uses: actions/checkout@v4
 

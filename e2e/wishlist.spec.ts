@@ -17,24 +17,35 @@ const GEN5_INDEX = {
     { name: 'oshawott', url: 'https://pokeapi.co/api/v2/pokemon-species/501/' },
   ],
 }
-const POKEMON: Record<string, { name: string, fr: string, type: string }> = {
+const POKEMON: Record<string, { name: string; fr: string; type: string }> = {
   495: { name: 'snivy', fr: 'Vipélierre', type: 'grass' },
   498: { name: 'tepig', fr: 'Gruikui', type: 'fire' },
   501: { name: 'oshawott', fr: 'Moustillon', type: 'water' },
 }
 
 async function mockPokeApi(page: Page) {
-  await page.route('https://beta.pokeapi.co/graphql/**', route => route.fulfill({ json: GRAPHQL_INDEX }))
+  await page.route('https://beta.pokeapi.co/graphql/**', (route) =>
+    route.fulfill({ json: GRAPHQL_INDEX }),
+  )
   await page.route('https://pokeapi.co/api/v2/**', (route) => {
     const url = new URL(route.request().url())
     const [, , , resource, id] = url.pathname.split('/') // /api/v2/<resource>/<id>
     const p = POKEMON[id ?? '']
     if (resource === 'generation') return route.fulfill({ json: GEN5_INDEX })
     if (resource === 'pokemon' && p) {
-      return route.fulfill({ json: { id: Number(id), name: p.name, types: [{ slot: 1, type: { name: p.type } }], sprites: { front_default: null } } })
+      return route.fulfill({
+        json: {
+          id: Number(id),
+          name: p.name,
+          types: [{ slot: 1, type: { name: p.type } }],
+          sprites: { front_default: null },
+        },
+      })
     }
     if (resource === 'pokemon-species' && p) {
-      return route.fulfill({ json: { names: [{ name: p.fr, language: { name: 'fr' } }] } })
+      return route.fulfill({
+        json: { names: [{ name: p.fr, language: { name: 'fr' } }] },
+      })
     }
     return route.fulfill({ status: 404, json: {} })
   })
@@ -45,7 +56,9 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/')
 })
 
-test('ajouter un Pokémon puis rafraîchir : il reste dans la liste', async ({ page }) => {
+test('ajouter un Pokémon puis rafraîchir : il reste dans la liste', async ({
+  page,
+}) => {
   await expect(page.getByText('Ta boîte est vide')).toBeVisible()
 
   // 1. Rechercher (en français, sans accent) et ajouter Vipélierre
@@ -64,7 +77,9 @@ test('ajouter un Pokémon puis rafraîchir : il reste dans la liste', async ({ p
   await expect(page.getByText('Ta boîte est vide')).toHaveCount(0)
 })
 
-test('supprimer un Pokémon : il ne revient pas après rafraîchissement', async ({ page }) => {
+test('supprimer un Pokémon : il ne revient pas après rafraîchissement', async ({
+  page,
+}) => {
   await page.getByLabel('Nom ou numéro').fill('498')
   await page.getByRole('button', { name: /Gruikui/ }).click()
   await expect(page.getByTestId('card-498')).toBeVisible()
@@ -77,7 +92,9 @@ test('supprimer un Pokémon : il ne revient pas après rafraîchissement', async
   await expect(page.getByTestId('card-498')).toHaveCount(0)
 })
 
-test('la capture est sauvegardée et met à jour la progression', async ({ page }) => {
+test('la capture est sauvegardée et met à jour la progression', async ({
+  page,
+}) => {
   await page.getByLabel('Nom ou numéro').fill('moustillon')
   await page.keyboard.press('Enter') // Entrée ajoute le premier résultat
   await expect(page.getByTestId('card-501')).toBeVisible()
