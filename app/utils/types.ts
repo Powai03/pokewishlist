@@ -21,5 +21,5 @@ const TYPES: Record<string, { label: string; color: string }> = {
 }
 
 export function typeInfo(type: string): { label: string; color: string } {
-      return TYPES[type] ?? { label: type, color: "#888888" };
+  return TYPES[type] ?? { label: type, color: '#888888' }
 }
