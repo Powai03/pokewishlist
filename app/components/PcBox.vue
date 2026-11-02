@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import type { Pokemon } from '~/utils/wishlist'
+import type { WishlistItem } from '~/types/pokemon'
 
 // La « Boîte » du PC de Noir et Blanc : une grille d'icônes sur un fond d'herbe.
-defineProps<{ list: Pokemon[]; selectedId: number | null; ready: boolean }>()
+defineProps<{
+  list: WishlistItem[]
+  selectedId: number | null
+  ready: boolean
+}>()
 defineEmits<{ select: [id: number] }>()
 </script>
 

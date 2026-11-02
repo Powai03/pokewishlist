@@ -10,11 +10,15 @@ import {
   removePokemon,
   searchSpecies,
   toggleCaptured,
-  type Pokemon,
-  type SpeciesEntry,
+  isPokemonType,
 } from '../app/utils/wishlist'
+import type { SpeciesEntry, WishlistItem } from '../app/types/pokemon'
 
-const make = (id: number, name: string, frName = name): Pokemon => ({
+const make = (
+  id: number,
+  name: string,
+  frName: string = name,
+): WishlistItem => ({
   id,
   name,
   frName,
@@ -47,6 +51,18 @@ describe('isGen5', () => {
     expect(isGen5(493)).toBe(false) // Arceus, 4e gén.
     expect(isGen5(650)).toBe(false) // Marisson, 6e gén.
     expect(isGen5(25)).toBe(false)
+  })
+})
+
+describe('isPokemonType', () => {
+  it('accepte les 18 types connus', () => {
+    expect(isPokemonType('grass')).toBe(true)
+    expect(isPokemonType('dragon')).toBe(true)
+  })
+  it('refuse le reste', () => {
+    expect(isPokemonType('plante')).toBe(false)
+    expect(isPokemonType('shadow')).toBe(false)
+    expect(isPokemonType(42)).toBe(false)
   })
 })
 
@@ -116,7 +132,7 @@ describe('addPokemon', () => {
     expect(addPokemon([], pikachu)).toEqual([])
   })
   it("ne modifie pas la liste d'origine", () => {
-    const original: Pokemon[] = []
+    const original: WishlistItem[] = []
     addPokemon(original, vipelierre)
     expect(original).toHaveLength(0)
   })
@@ -156,6 +172,12 @@ describe('parseStoredWishlist (relecture du localStorage)', () => {
     expect(parseStoredWishlist(null)).toEqual([])
     expect(parseStoredWishlist('{pas du json')).toEqual([])
     expect(parseStoredWishlist('"texte"')).toEqual([])
+  })
+  it('ne garde que les types valides', () => {
+    const raw = JSON.stringify([
+      { ...vipelierre, types: ['grass', 'plante', 7] },
+    ])
+    expect(parseStoredWishlist(raw)[0]?.types).toEqual(['grass'])
   })
   it('écarte les entrées invalides et hors 5e génération', () => {
     const raw = JSON.stringify([

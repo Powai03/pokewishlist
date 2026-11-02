@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Pokemon } from '~/utils/wishlist'
+import type { Pokemon, WishlistItem } from '~/types/pokemon'
 
 useHead({
   title: 'PokéWishlist · Unys',
@@ -15,16 +15,16 @@ useHead({
 })
 
 const { list, ready, stats, add, remove, toggle } = useWishlist()
-const owned = computed(() => list.value.map((p) => p.id))
+const owned = computed<number[]>(() => list.value.map((p) => p.id))
 
 // Pokémon affiché sur l'écran du haut : celui qu'on a choisi, sinon le premier de la boîte.
 const selectedId = ref<number | null>(null)
-const selected = computed(
+const selected = computed<WishlistItem | null>(
   () =>
     list.value.find((p) => p.id === selectedId.value) ?? list.value[0] ?? null,
 )
 
-function onAdd(pokemon: Pokemon) {
+function onAdd(pokemon: Pokemon): void {
   add(pokemon)
   selectedId.value = pokemon.id
 }

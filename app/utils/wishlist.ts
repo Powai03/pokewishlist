@@ -1,28 +1,30 @@
 // Logique métier de la wishlist : fonctions pures (pas de DOM, pas de réseau),
 // donc faciles à tester. Chaque fonction renvoie une NOUVELLE liste sans modifier l'ancienne.
+import {
+  POKEMON_TYPES,
+  type Pokemon,
+  type PokemonType,
+  type SpeciesEntry,
+  type WishlistItem,
+  type WishlistStats,
+} from '../types/pokemon'
 
 /** 5e génération (région d'Unys, Pokémon Noir et Blanc) : de Victini (#494) à Genesect (#649). */
 export const GEN5 = { first: 494, last: 649 } as const
 
-export interface Pokemon {
-  id: number
-  name: string // nom anglais, tel que renvoyé par PokéAPI (ex. « snivy »)
-  frName: string // nom français (ex. « Vipélierre »)
-  sprite: string | null // sprite animé de Noir et Blanc (écran du haut)
-  icon: string | null // petite icône de menu (boîte du PC)
-  types: string[]
-  captured: boolean
-}
-
-/** Entrée de l'index de recherche : numéro, nom anglais et nom français (si disponible). */
-export interface SpeciesEntry {
-  id: number
-  name: string
-  frName?: string
-}
-
 export function isGen5(id: number): boolean {
   return Number.isInteger(id) && id >= GEN5.first && id <= GEN5.last
+}
+
+/**
+ * Garde de type : vérifie qu'un texte venu de l'extérieur (API, localStorage) est bien un des 18 types.
+ * Si elle renvoie `true`, TypeScript sait ensuite que `value` est un `PokemonType`.
+ */
+export function isPokemonType(value: unknown): value is PokemonType {
+  return (
+    typeof value === 'string' &&
+    (POKEMON_TYPES as readonly string[]).includes(value)
+  )
 }
 
 /** Extrait le numéro d'une URL PokéAPI : « …/pokemon-species/495/ » → 495. */
@@ -54,14 +56,14 @@ export function normalizeQuery(input: string): string {
 export function searchSpecies(
   entries: SpeciesEntry[],
   input: string,
-  limit = 8,
+  limit: number = 8,
 ): SpeciesEntry[] {
   const query = normalizeQuery(input)
   if (!query) return []
   if (/^\d+$/.test(query)) return entries.filter((e) => e.id === Number(query))
   // Score : 0 = le nom français commence par la saisie, 1 = l'anglais commence,
   //         2 = le français la contient, 3 = l'anglais la contient, -1 = aucun rapport.
-  const rank = (e: SpeciesEntry) => {
+  const rank = (e: SpeciesEntry): number => {
     const fr = fold(e.frName ?? '')
     if (fr.startsWith(query)) return 0
     if (e.name.startsWith(query)) return 1
@@ -77,26 +79,36 @@ export function searchSpecies(
     .map((x) => x.e)
 }
 
-/** Ajoute un Pokémon de 5e génération s'il n'y est pas déjà ; la liste reste triée par numéro. */
-export function addPokemon(list: Pokemon[], pokemon: Pokemon): Pokemon[] {
+/**
+ * Ajoute un Pokémon de 5e génération s'il n'y est pas déjà ; la liste reste triée par numéro.
+ * Reçoit un `Pokemon` (données de l'API) et le transforme en `WishlistItem` (ajoute l'état de capture).
+ */
+export function addPokemon(
+  list: WishlistItem[],
+  pokemon: Pokemon,
+  captured: boolean = false,
+): WishlistItem[] {
   if (!isGen5(pokemon.id) || list.some((p) => p.id === pokemon.id)) return list
-  return [...list, pokemon].sort((a, b) => a.id - b.id)
+  const item: WishlistItem = { ...pokemon, captured }
+  return [...list, item].sort((a, b) => a.id - b.id)
 }
 
-export function removePokemon(list: Pokemon[], id: number): Pokemon[] {
+export function removePokemon(
+  list: WishlistItem[],
+  id: number,
+): WishlistItem[] {
   return list.filter((p) => p.id !== id)
 }
 
-export function toggleCaptured(list: Pokemon[], id: number): Pokemon[] {
+export function toggleCaptured(
+  list: WishlistItem[],
+  id: number,
+): WishlistItem[] {
   return list.map((p) => (p.id === id ? { ...p, captured: !p.captured } : p))
 }
 
 /** Progression de la chasse : combien capturés sur combien, et le pourcentage arrondi. */
-export function progress(list: Pokemon[]): {
-  captured: number
-  total: number
-  percent: number
-} {
+export function progress(list: WishlistItem[]): WishlistStats {
   const total = list.length
   const captured = list.filter((p) => p.captured).length
   return {
@@ -109,8 +121,9 @@ export function progress(list: Pokemon[]): {
 /**
  * Relit la liste sauvegardée dans le localStorage SANS lui faire confiance :
  * JSON cassé, données d'une ancienne version ou Pokémon hors 5e génération sont écartés.
+ * Les données arrivent en `unknown` : chaque champ est vérifié avant d'être utilisé.
  */
-export function parseStoredWishlist(raw: string | null): Pokemon[] {
+export function parseStoredWishlist(raw: string | null): WishlistItem[] {
   let data: unknown
   try {
     data = JSON.parse(raw ?? '[]')
@@ -119,22 +132,20 @@ export function parseStoredWishlist(raw: string | null): Pokemon[] {
   }
   if (!Array.isArray(data)) return []
 
-  let list: Pokemon[] = []
-  for (const item of data) {
+  let list: WishlistItem[] = []
+  for (const item of data as unknown[]) {
     if (typeof item !== 'object' || item === null) continue
-    const p = item as Partial<Pokemon>
+    const p = item as Partial<Record<keyof WishlistItem, unknown>>
     if (typeof p.id !== 'number' || typeof p.name !== 'string') continue
-    list = addPokemon(list, {
+    const pokemon: Pokemon = {
       id: p.id,
       name: p.name,
       frName: typeof p.frName === 'string' ? p.frName : p.name,
       sprite: typeof p.sprite === 'string' ? p.sprite : null,
       icon: typeof p.icon === 'string' ? p.icon : null,
-      types: Array.isArray(p.types)
-        ? p.types.filter((t) => typeof t === 'string')
-        : [],
-      captured: p.captured === true,
-    })
+      types: Array.isArray(p.types) ? p.types.filter(isPokemonType) : [],
+    }
+    list = addPokemon(list, pokemon, p.captured === true)
   }
   return list
 }
