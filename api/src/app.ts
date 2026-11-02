@@ -1,7 +1,8 @@
 // L'application Hono : les routes, SANS démarrer de serveur.
 // Séparée de index.ts pour pouvoir la tester avec `app.request()` (aucun port réseau ouvert).
 import { Hono } from 'hono'
-import type { AppConfig, AppEnv } from './config.js'
+import { cors } from 'hono/cors'
+import { DEFAULT_CORS_ORIGINS, type AppConfig, type AppEnv } from './config.js'
 import { wishlistRoutes } from './routes/wishlist.js'
 import { WishlistStore } from './wishlist-store.js'
 
@@ -21,11 +22,24 @@ export interface HealthResponse {
  * chaque test peut ainsi partir d'une wishlist vide, sans influencer les autres.
  */
 export function createApp(
-  config: Pick<AppConfig, 'version' | 'env'>,
+  config: Pick<AppConfig, 'version' | 'env'> &
+    Partial<Pick<AppConfig, 'corsOrigins'>>,
   store: WishlistStore = new WishlistStore(),
 ): Hono {
   const app = new Hono()
   const startedAt = Date.now()
+
+  // CORS : le front (ex. http://localhost:3001) et l'API (http://localhost:3002) sont deux « origines »
+  // différentes ; sans cette autorisation explicite, le navigateur bloque les appels du front.
+  // Seules les origines listées sont autorisées (pas « * »).
+  app.use(
+    '*',
+    cors({
+      origin: config.corsOrigins ?? DEFAULT_CORS_ORIGINS,
+      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE'],
+      allowHeaders: ['Content-Type'],
+    }),
+  )
 
   // Contrôle de santé : utilisé par la CI, un hébergeur ou un outil de supervision
   // pour savoir si l'API répond, et QUELLE version tourne dans QUEL environnement.

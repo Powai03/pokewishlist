@@ -189,3 +189,126 @@ describe('autres cas', () => {
     expect(await (await autre.request('/wishlist')).json()).toEqual([])
   })
 })
+
+// ── POST : champs complets envoyés par le front ───────────────────────────────
+describe('POST /wishlist : données complètes du Pokémon', () => {
+  const complet = {
+    id: 644,
+    name: 'zekrom',
+    frName: 'Zekrom',
+    sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/644.gif',
+    icon: 'https://raw.githubusercontent.com/PokeAPI/sprites/icons/644.png',
+    types: ['dragon', 'electric'],
+  }
+
+  it('201 + tous les champs sont conservés', async () => {
+    const res = await post(complet)
+    expect(res.status).toBe(201)
+    expect(await res.json()).toMatchObject({ ...complet, captured: false })
+  })
+
+  it('frName vaut name, sprite/icon null et types [] quand ils sont absents', async () => {
+    const res = await post({ id: 495, name: 'snivy' })
+    expect(await res.json()).toMatchObject({
+      frName: 'snivy',
+      sprite: null,
+      icon: null,
+      types: [],
+    })
+  })
+
+  it.each([
+    ['sprite qui n’est pas une adresse', { sprite: 'javascript:alert(1)' }],
+    ['icon qui n’est pas un texte', { icon: 42 }],
+    ['types qui n’est pas une liste', { types: 'dragon' }],
+    ['plus de 2 types', { types: ['a', 'b', 'c'] }],
+    ['frName vide', { frName: '' }],
+  ])('%s → 400', async (_label, extra) => {
+    expect((await post({ ...complet, ...extra })).status).toBe(400)
+  })
+})
+
+// ── PATCH /wishlist/:id ───────────────────────────────────────────────────────
+describe('PATCH /wishlist/:id', () => {
+  function patch(
+    id: string | number,
+    body: unknown,
+  ): Promise<Response> | Response {
+    return app.request(`/wishlist/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  it('200 + marque le Pokémon capturé, visible ensuite dans GET', async () => {
+    await post(vipelierre)
+    const res = await patch(495, { captured: true })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ id: 495, captured: true })
+    expect((await list())[0]?.captured).toBe(true)
+  })
+
+  it('200 + peut le « relâcher » (captured: false)', async () => {
+    await post(vipelierre)
+    await patch(495, { captured: true })
+    expect(await (await patch(495, { captured: false })).json()).toMatchObject({
+      captured: false,
+    })
+  })
+
+  it('404 si le Pokémon n’est pas dans la wishlist', async () => {
+    expect((await patch(495, { captured: true })).status).toBe(404)
+  })
+
+  it.each([
+    ['captured manquant', {}],
+    ['captured en texte', { captured: 'oui' }],
+  ])('%s → 400', async (_label, body) => {
+    await post(vipelierre)
+    expect((await patch(495, body)).status).toBe(400)
+  })
+
+  it('400 si l’id n’est pas un nombre', async () => {
+    expect((await patch('abc', { captured: true })).status).toBe(400)
+  })
+})
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
+describe('CORS', () => {
+  const corsApp = createApp({
+    version: '0.0.0-test',
+    env: 'test',
+    corsOrigins: ['http://localhost:3001'],
+  })
+
+  it('autorise le front déclaré (en-tête Access-Control-Allow-Origin)', async () => {
+    const res = await corsApp.request('/wishlist', {
+      headers: { Origin: 'http://localhost:3001' },
+    })
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
+      'http://localhost:3001',
+    )
+  })
+
+  it('n’autorise pas une autre origine', async () => {
+    const res = await corsApp.request('/wishlist', {
+      headers: { Origin: 'https://site-pirate.example' },
+    })
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+  })
+
+  it('répond à la requête préalable (preflight) du navigateur pour un POST JSON', async () => {
+    const res = await corsApp.request('/wishlist', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'http://localhost:3001',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST')
+  })
+})

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { createApp, type HealthResponse } from '../src/app.js'
-import { loadConfig, parseEnv, parsePort, readVersion } from '../src/config.js'
+import {
+  DEFAULT_CORS_ORIGINS,
+  loadConfig,
+  parseCorsOrigins,
+  parseEnv,
+  parsePort,
+  readVersion,
+} from '../src/config.js'
 
 describe('GET /health', () => {
   const app = createApp({ version: '1.2.3', env: 'test' })
@@ -64,5 +71,17 @@ describe('configuration', () => {
       env: 'production',
       port: 4000,
     })
+  })
+
+  it.each([
+    [undefined, DEFAULT_CORS_ORIGINS],
+    ['', DEFAULT_CORS_ORIGINS],
+    ['https://pokewishlist.fr', ['https://pokewishlist.fr']],
+    [
+      ' http://localhost:3100/ , https://a.fr ',
+      ['http://localhost:3100', 'https://a.fr'],
+    ],
+  ])('CORS_ORIGIN=%j → %j', (value, expected) => {
+    expect(parseCorsOrigins(value)).toEqual(expected)
   })
 })

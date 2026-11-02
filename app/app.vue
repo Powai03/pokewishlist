@@ -14,7 +14,7 @@ useHead({
   ],
 })
 
-const { list, ready, stats, full, add, remove, toggle } = useWishlist()
+const { list, ready, error, stats, full, add, remove, toggle } = useWishlist()
 const owned = computed<number[]>(() => list.value.map((p) => p.id))
 
 // Pokémon affiché sur l'écran du haut : celui qu'on a choisi, sinon le premier de la boîte.
@@ -24,9 +24,9 @@ const selected = computed<WishlistItem | null>(
     list.value.find((p) => p.id === selectedId.value) ?? list.value[0] ?? null,
 )
 
-function onAdd(pokemon: Pokemon): void {
-  add(pokemon)
-  selectedId.value = pokemon.id
+async function onAdd(pokemon: Pokemon): Promise<void> {
+  // L'API enregistre le Pokémon ; on ne le sélectionne que si l'ajout a réussi.
+  if (await add(pokemon)) selectedId.value = pokemon.id
 }
 </script>
 
@@ -54,6 +54,16 @@ function onAdd(pokemon: Pokemon): void {
 
       <div class="ds-shell ds-bottom">
         <div class="ds-screen touch">
+          <!-- Erreur de l'API (injoignable, conflit…) : affichée sans bloquer l'appli -->
+          <p
+            v-if="error"
+            class="api-error"
+            role="alert"
+            data-testid="api-error"
+          >
+            {{ error }}
+          </p>
+
           <!-- Commandes du combat : les gros boutons colorés de Noir et Blanc -->
           <div
             v-if="ready && selected"
@@ -263,6 +273,16 @@ button:disabled {
   box-shadow:
     0 0 0 3px #0c0c0e,
     0 1px 0 3px #0c0c0e;
+}
+.api-error {
+  margin: 0;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: #fff;
+  background: #a8322a;
+  border: 3px solid #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px #0c0c0e;
 }
 .cmd-catch {
   background: linear-gradient(#ff8a6a 0 48%, #e8402a 52%);
