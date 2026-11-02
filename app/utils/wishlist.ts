@@ -102,6 +102,7 @@ export function addPokemon(
 ): WishlistItem[] {
   if (!isGen5(pokemon.id)) return list
   if (list.some((p) => p.id === pokemon.id)) return list
+  if (isFull(list)) return list
   const item: WishlistItem = { ...pokemon, captured }
   return [...list, item].sort((a, b) => a.id - b.id)
 }
