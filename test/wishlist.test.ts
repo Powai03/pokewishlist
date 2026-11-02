@@ -46,6 +46,6 @@ describe('progress', () => {
   })
   it('calcule le pourcentage arrondi', () => {
     const list = [{ ...pikachu, captured: true }, bulbizarre, { ...bulbizarre, id: 4 }]
-    expect(progress(list)).toEqual({ captured: 1, total: 3, percent: 33 })
+    expect(progress(list)).toEqual({ captured: 1, total: 3, percent: 50 })
   })
 })
