@@ -11,6 +11,8 @@ import {
   searchSpecies,
   toggleCaptured,
   isPokemonType,
+  isFull,
+  WISHLIST_MAX,
 } from '../app/utils/wishlist'
 import type { SpeciesEntry, WishlistItem } from '../app/types/pokemon'
 
@@ -121,20 +123,76 @@ describe('searchSpecies', () => {
 })
 
 describe('addPokemon', () => {
-  it('ajoute et trie par numéro', () => {
-    const list = addPokemon(addPokemon([], gruikui), vipelierre)
-    expect(list.map((p) => p.id)).toEqual([495, 498])
+  // Une équipe de 6 Pokémon d'Unys, pour remplir la liste.
+  const team: WishlistItem[] = [
+    make(495, 'snivy', 'Vipélierre'),
+    make(498, 'tepig', 'Gruikui'),
+    make(501, 'oshawott', 'Moustillon'),
+    make(570, 'zorua', 'Zorua'),
+    make(610, 'axew', 'Coupenotte'),
+    make(633, 'deino', 'Solochi'),
+  ]
+  const zekrom = make(644, 'zekrom', 'Zekrom')
+
+  describe('ajout', () => {
+    it('ajoute un Pokémon à une liste vide', () => {
+      const list = addPokemon([], vipelierre)
+      expect(list).toHaveLength(1)
+      expect(list[0]?.frName).toBe('Vipélierre')
+    })
+    it('le transforme en WishlistItem non capturé par défaut', () => {
+      const pokemon = { ...vipelierre, captured: undefined } // un Pokemon « brut » de l'API
+      expect(addPokemon([], pokemon)[0]?.captured).toBe(false)
+    })
+    it('garde la liste triée par numéro', () => {
+      const list = addPokemon(addPokemon([], gruikui), vipelierre)
+      expect(list.map((p) => p.id)).toEqual([495, 498])
+    })
+    it("ne modifie pas la liste d'origine", () => {
+      const original: WishlistItem[] = []
+      addPokemon(original, vipelierre)
+      expect(original).toHaveLength(0)
+    })
+    it('refuse un Pokémon hors 5e génération', () => {
+      expect(addPokemon([], pikachu)).toEqual([])
+    })
   })
-  it('ignore les doublons', () => {
-    expect(addPokemon([vipelierre], vipelierre)).toHaveLength(1)
+
+  describe('doublon', () => {
+    it("n'ajoute pas un Pokémon déjà présent", () => {
+      const list = addPokemon([vipelierre], vipelierre)
+      expect(list).toHaveLength(1)
+    })
+    it('renvoie la même liste, sans copie inutile', () => {
+      const list = [vipelierre]
+      expect(addPokemon(list, vipelierre)).toBe(list)
+    })
+    it("conserve l'état capturé de l'exemplaire déjà présent", () => {
+      const list = [{ ...vipelierre, captured: true }]
+      expect(addPokemon(list, vipelierre)[0]?.captured).toBe(true)
+    })
   })
-  it('refuse un Pokémon hors 5e génération', () => {
-    expect(addPokemon([], pikachu)).toEqual([])
-  })
-  it("ne modifie pas la liste d'origine", () => {
-    const original: WishlistItem[] = []
-    addPokemon(original, vipelierre)
-    expect(original).toHaveLength(0)
+
+  describe(`liste pleine (${WISHLIST_MAX} Pokémon maximum)`, () => {
+    it('la limite vaut 6', () => {
+      expect(WISHLIST_MAX).toBe(6)
+    })
+    it('accepte le 6e Pokémon', () => {
+      const five = team.slice(0, 5)
+      expect(addPokemon(five, team[5]!)).toHaveLength(6)
+      expect(isFull(five)).toBe(false)
+    })
+    it('refuse le 7e Pokémon : la liste reste à 6, inchangée', () => {
+      expect(isFull(team)).toBe(true)
+      const list = addPokemon(team, zekrom)
+      expect(list).toHaveLength(6)
+      expect(list).toBe(team)
+      expect(list.some((p) => p.id === 644)).toBe(false)
+    })
+    it('accepte de nouveau un ajout après un retrait', () => {
+      const five = removePokemon(team, 495)
+      expect(addPokemon(five, zekrom).map((p) => p.id)).toContain(644)
+    })
   })
 })
 
@@ -178,6 +236,11 @@ describe('parseStoredWishlist (relecture du localStorage)', () => {
       { ...vipelierre, types: ['grass', 'plante', 7] },
     ])
     expect(parseStoredWishlist(raw)[0]?.types).toEqual(['grass'])
+  })
+  it('ne relit que 6 Pokémon même si le stockage en contient plus', () => {
+    const ids = [494, 495, 496, 497, 498, 499, 500, 501]
+    const raw = JSON.stringify(ids.map((id) => make(id, `p${id}`)))
+    expect(parseStoredWishlist(raw)).toHaveLength(WISHLIST_MAX)
   })
   it('écarte les entrées invalides et hors 5e génération', () => {
     const raw = JSON.stringify([
