@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '~/assets/css/unys.css'
 import type { Pokemon, WishlistItem } from '~/types/pokemon'
 
 useHead({
