@@ -37,8 +37,11 @@ async function add(entry: SpeciesEntry): Promise<void> {
   try {
     emit('add', await fetchPokemon(entry))
     query.value = ''
-  } catch {
-    error.value = `Impossible de récupérer ${label(entry)}. Réessaie.`
+  } catch (e: unknown) {
+    error.value =
+      e instanceof PokemonNotFoundError
+        ? `${label(entry)} est introuvable sur PokéAPI.`
+        : `Impossible de récupérer ${label(entry)}. Réessaie.`
   } finally {
     pendingId.value = null
   }
