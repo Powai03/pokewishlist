@@ -107,3 +107,70 @@ test('la capture est sauvegardée et met à jour la progression', async ({
   await expect(page.getByTestId('progress')).toHaveText('1/1')
   await expect(page.getByRole('button', { name: 'Relâcher' })).toBeVisible()
 })
+
+// ── localStorage corrompu : l'application ne doit jamais planter ──────────────
+test.describe('localStorage corrompu', () => {
+  // Écrit `raw` à la place de la sauvegarde, puis recharge la page pour que l'appli le relise.
+  async function corruptStorageAndReload(
+    page: Page,
+    raw: string,
+  ): Promise<void> {
+    await page.evaluate(
+      (value) => localStorage.setItem('pokewishlist', value),
+      raw,
+    )
+    await page.reload()
+  }
+
+  test("un JSON corrompu ne fait pas planter l'application", async ({
+    page,
+  }) => {
+    // Toute erreur JavaScript non rattrapée dans la page est enregistrée ici.
+    const pageErrors: string[] = []
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await corruptStorageAndReload(page, '{"id":495,"name":"sni') // sauvegarde coupée au milieu
+
+    // 1. L'appli s'affiche normalement, avec une boîte vide (pas d'écran d'erreur)
+    await expect(page.getByText('Ta boîte est vide')).toBeVisible()
+    await expect(page.getByLabel('Nom ou numéro')).toBeEnabled()
+
+    // 2. Elle reste utilisable : on peut ajouter un Pokémon…
+    await page.getByLabel('Nom ou numéro').fill('vipe')
+    await page.getByRole('button', { name: /Vipélierre/ }).click()
+    await expect(page.getByTestId('card-495')).toBeVisible()
+
+    // 3. … et la nouvelle sauvegarde, valide, remplace la sauvegarde corrompue
+    await page.reload()
+    await expect(page.getByTestId('card-495')).toBeVisible()
+    expect(
+      await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('pokewishlist') ?? 'null'),
+      ),
+    ).toHaveLength(1)
+
+    // 4. Aucune erreur JavaScript pendant tout le scénario
+    expect(pageErrors).toEqual([])
+  })
+
+  test('sauvegarde en partie abîmée : seuls les Pokémon valides s’affichent', async ({
+    page,
+  }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await corruptStorageAndReload(
+      page,
+      JSON.stringify([
+        { id: 495, name: 'snivy', frName: 'Vipélierre', types: ['grass'] },
+        null,
+        { id: 'x', name: 'zorua' },
+        { id: 25, name: 'pikachu', frName: 'Pikachu' }, // hors 5e génération
+      ]),
+    )
+
+    await expect(page.getByTestId('card-495')).toBeVisible()
+    await expect(page.locator('[data-testid^="card-"]')).toHaveCount(1)
+    expect(pageErrors).toEqual([])
+  })
+})

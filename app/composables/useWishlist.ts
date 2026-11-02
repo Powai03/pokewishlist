@@ -1,8 +1,7 @@
-// État partagé de la wishlist + sauvegarde automatique dans le localStorage.
+// État partagé de la wishlist + sauvegarde automatique dans le localStorage
+// (la lecture/écriture elle-même est dans app/utils/storage.ts, testée à part).
 import type { ComputedRef, Ref } from 'vue'
 import type { Pokemon, WishlistItem, WishlistStats } from '~/types/pokemon'
-
-export const STORAGE_KEY = 'pokewishlist'
 
 /** Ce que renvoie `useWishlist()` : l'état de la liste et les actions possibles. */
 export interface UseWishlist {
@@ -25,11 +24,8 @@ export function useWishlist(): UseWishlist {
   // Le localStorage n'existe que dans le navigateur : on le lit après le montage, jamais côté serveur.
   onMounted(() => {
     if (ready.value) return
-    try {
-      list.value = parseStoredWishlist(localStorage.getItem(STORAGE_KEY))
-    } catch {
-      list.value = [] // stockage bloqué (navigation privée stricte)
-    }
+    const storage = getBrowserStorage()
+    list.value = storage ? loadWishlist(storage) : [] // ne lève jamais, même si le JSON est corrompu
     ready.value = true
   })
 
@@ -37,11 +33,8 @@ export function useWishlist(): UseWishlist {
     list,
     (value: WishlistItem[]): void => {
       if (!ready.value) return
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-      } catch {
-        // stockage indisponible : la liste reste en mémoire pour cette session
-      }
+      const storage = getBrowserStorage()
+      if (storage) saveWishlist(value, storage) // si ça échoue, la liste reste en mémoire
     },
     { deep: true },
   )
