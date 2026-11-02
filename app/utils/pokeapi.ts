@@ -1,10 +1,42 @@
 // Accès à PokéAPI (https://pokeapi.co) : API publique, gratuite, sans clé.
+// On utilise le `fetch` STANDARD du navigateur (et de Node.js) plutôt que le `$fetch` de Nuxt :
+// il fonctionne partout, y compris dans les tests Vitest, où on peut le remplacer par un faux (mock).
 import type { Pokemon, SpeciesEntry } from '../types/pokemon'
 import { GEN5, idFromUrl, isGen5, isPokemonType } from './wishlist'
 
 const API = 'https://pokeapi.co/api/v2'
 const GRAPHQL = 'https://beta.pokeapi.co/graphql/v1beta'
 const LANG_FR = 5 // identifiant de la langue française dans PokéAPI
+
+/** Erreur renvoyée par PokéAPI (statut HTTP autre que 2xx). */
+export class PokeApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly url: string,
+  ) {
+    super(`PokéAPI a répondu ${status} pour ${url}`)
+    this.name = 'PokeApiError'
+  }
+}
+
+/** Cas particulier : PokéAPI répond 404, le Pokémon demandé n'existe pas. */
+export class PokemonNotFoundError extends PokeApiError {
+  constructor(url: string) {
+    super(404, url)
+    this.name = 'PokemonNotFoundError'
+  }
+}
+
+/**
+ * Appelle PokéAPI et renvoie le JSON de la réponse.
+ * `fetch` ne lève PAS d'erreur sur un 404 ou un 500 : il faut regarder `res.ok` soi-même.
+ */
+async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init)
+  if (res.status === 404) throw new PokemonNotFoundError(url)
+  if (!res.ok) throw new PokeApiError(res.status, url)
+  return (await res.json()) as T
+}
 
 interface GraphqlResponse {
   data?: { species: { id: number; name: string; names: { name: string }[] }[] }
@@ -54,9 +86,10 @@ const GEN5_QUERY = `query {
  */
 export async function fetchGen5Index(): Promise<SpeciesEntry[]> {
   try {
-    const res = await $fetch<GraphqlResponse>(GRAPHQL, {
+    const res = await getJson<GraphqlResponse>(GRAPHQL, {
       method: 'POST',
-      body: { query: GEN5_QUERY },
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: GEN5_QUERY }),
     })
     const species = res.data?.species ?? []
     if (species.length) {
@@ -71,24 +104,27 @@ export async function fetchGen5Index(): Promise<SpeciesEntry[]> {
   } catch {
     // GraphQL indisponible (c'est une API « beta ») : on passe au secours
   }
-  const data = await $fetch<GenerationResponse>(`${API}/generation/5`)
+  const data = await getJson<GenerationResponse>(`${API}/generation/5`)
   return data.pokemon_species
     .map((s): SpeciesEntry => ({ id: idFromUrl(s.url), name: s.name }))
     .filter((s) => isGen5(s.id))
     .sort((a, b) => a.id - b.id)
 }
 
-/** Fiche complète d'un Pokémon : sprite animé de Noir et Blanc, icône de menu, types et nom français. */
+/**
+ * Fiche complète d'un Pokémon : sprite animé de Noir et Blanc, icône de menu, types et nom français.
+ * @throws PokemonNotFoundError si PokéAPI répond 404 ; PokeApiError pour les autres erreurs HTTP.
+ */
 export async function fetchPokemon(entry: SpeciesEntry): Promise<Pokemon> {
   if (!isGen5(entry.id))
     throw new Error(
       `#${entry.id} n'est pas de 5e génération (#${GEN5.first}–#${GEN5.last})`,
     )
   const [pokemon, frName]: [PokemonResponse, string] = await Promise.all([
-    $fetch<PokemonResponse>(`${API}/pokemon/${entry.id}`),
+    getJson<PokemonResponse>(`${API}/pokemon/${entry.id}`),
     // Nom français déjà connu grâce à l'index ? Sinon, on le demande à l'API.
     entry.frName ??
-      $fetch<SpeciesResponse>(`${API}/pokemon-species/${entry.id}`).then(
+      getJson<SpeciesResponse>(`${API}/pokemon-species/${entry.id}`).then(
         (s) =>
           s.names.find((n) => n.language.name === 'fr')?.name ?? entry.name,
       ),
