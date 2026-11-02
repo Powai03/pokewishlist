@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { WishlistItem, WishlistStats } from '~/types/pokemon'
+import { formatDexNumber } from '~/utils/format'
 
 // Écran du haut de la « DS » : une scène de combat façon Pokémon Noir et Blanc.
 const props = defineProps<{
@@ -39,9 +40,7 @@ const barClass = computed<BarClass>(() =>
       <div v-if="pokemon" class="foe-box">
         <div class="foe-line">
           <span class="foe-name">{{ pokemon.frName }}</span>
-          <span class="foe-no"
-            >N°{{ String(pokemon.id).padStart(3, '0') }}</span
-          >
+          <span class="foe-no">N°{{ formatDexNumber(pokemon.id) }}</span>
         </div>
         <ul class="foe-types">
           <li
