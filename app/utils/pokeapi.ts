@@ -1,11 +1,6 @@
 // Accès à PokéAPI (https://pokeapi.co) : API publique, gratuite, sans clé.
-import {
-  GEN5,
-  idFromUrl,
-  isGen5,
-  type Pokemon,
-  type SpeciesEntry,
-} from './wishlist'
+import type { Pokemon, SpeciesEntry } from '../types/pokemon'
+import { GEN5, idFromUrl, isGen5, isPokemonType } from './wishlist'
 
 const API = 'https://pokeapi.co/api/v2'
 const GRAPHQL = 'https://beta.pokeapi.co/graphql/v1beta'
@@ -41,6 +36,9 @@ interface SpeciesResponse {
   names: { name: string; language: { name: string } }[]
 }
 
+// Les interfaces ci-dessus décrivent ce que PokéAPI RENVOIE (format brut de l'API) ;
+// les fonctions ci-dessous le convertissent en NOS types (`SpeciesEntry`, `Pokemon`).
+
 // Une seule requête GraphQL : les 156 Pokémon d'Unys avec leur nom français.
 const GEN5_QUERY = `query {
   species: pokemon_v2_pokemonspecies(where: {generation_id: {_eq: 5}}, order_by: {id: asc}) {
@@ -64,7 +62,7 @@ export async function fetchGen5Index(): Promise<SpeciesEntry[]> {
     if (species.length) {
       return species
         .filter((s) => isGen5(s.id))
-        .map((s) => ({
+        .map((s): SpeciesEntry => ({
           id: s.id,
           name: s.name,
           frName: s.names[0]?.name ?? s.name,
@@ -75,7 +73,7 @@ export async function fetchGen5Index(): Promise<SpeciesEntry[]> {
   }
   const data = await $fetch<GenerationResponse>(`${API}/generation/5`)
   return data.pokemon_species
-    .map((s) => ({ id: idFromUrl(s.url), name: s.name }))
+    .map((s): SpeciesEntry => ({ id: idFromUrl(s.url), name: s.name }))
     .filter((s) => isGen5(s.id))
     .sort((a, b) => a.id - b.id)
 }
@@ -86,7 +84,7 @@ export async function fetchPokemon(entry: SpeciesEntry): Promise<Pokemon> {
     throw new Error(
       `#${entry.id} n'est pas de 5e génération (#${GEN5.first}–#${GEN5.last})`,
     )
-  const [pokemon, frName] = await Promise.all([
+  const [pokemon, frName]: [PokemonResponse, string] = await Promise.all([
     $fetch<PokemonResponse>(`${API}/pokemon/${entry.id}`),
     // Nom français déjà connu grâce à l'index ? Sinon, on le demande à l'API.
     entry.frName ??
@@ -107,9 +105,10 @@ export async function fetchPokemon(entry: SpeciesEntry): Promise<Pokemon> {
     icon:
       pokemon.sprites.versions?.['generation-vii']?.icons?.front_default ??
       null,
+    // L'API renvoie de simples textes : on ne garde que les 18 types connus (garde de type).
     types: [...pokemon.types]
       .sort((a, b) => a.slot - b.slot)
-      .map((t) => t.type.name),
-    captured: false,
+      .map((t) => t.type.name)
+      .filter(isPokemonType),
   }
 }

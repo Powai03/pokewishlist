@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import type { Pokemon, SpeciesEntry } from '~/utils/wishlist'
+import type { Pokemon, SpeciesEntry } from '~/types/pokemon'
 
 const props = defineProps<{ owned: number[] }>()
 const emit = defineEmits<{ add: [pokemon: Pokemon] }>()
 
 const index = ref<SpeciesEntry[]>([])
-const indexError = ref(false)
-const query = ref('')
+const indexError = ref<boolean>(false)
+const query = ref<string>('')
 const pendingId = ref<number | null>(null)
-const error = ref('')
+const error = ref<string>('')
 
 // L'index des 156 Pokémon d'Unys (avec leurs noms français) est chargé une fois, au montage.
-onMounted(async () => {
+onMounted(async (): Promise<void> => {
   try {
     index.value = await fetchGen5Index()
   } catch {
@@ -19,16 +19,18 @@ onMounted(async () => {
   }
 })
 
-const results = computed(() => searchSpecies(index.value, query.value, 6))
-const noResult = computed(
+const results = computed<SpeciesEntry[]>(() =>
+  searchSpecies(index.value, query.value, 6),
+)
+const noResult = computed<boolean>(
   () =>
     query.value.trim() !== '' &&
     index.value.length > 0 &&
     results.value.length === 0,
 )
-const label = (e: SpeciesEntry) => e.frName ?? e.name
+const label = (e: SpeciesEntry): string => e.frName ?? e.name
 
-async function add(entry: SpeciesEntry) {
+async function add(entry: SpeciesEntry): Promise<void> {
   if (props.owned.includes(entry.id) || pendingId.value) return
   pendingId.value = entry.id
   error.value = ''
@@ -42,7 +44,7 @@ async function add(entry: SpeciesEntry) {
   }
 }
 
-function addFirst() {
+function addFirst(): void {
   const first = results.value.find((r) => !props.owned.includes(r.id))
   if (first) add(first)
 }

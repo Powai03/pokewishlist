@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { Pokemon } from '~/utils/wishlist'
+import type { WishlistItem, WishlistStats } from '~/types/pokemon'
 
 // Écran du haut de la « DS » : une scène de combat façon Pokémon Noir et Blanc.
 const props = defineProps<{
-  pokemon: Pokemon | null
-  stats: { captured: number; total: number; percent: number }
+  pokemon: WishlistItem | null
+  stats: WishlistStats
 }>()
 
-const message = computed(() => {
+const message = computed<string>(() => {
   const p = props.pokemon
   if (!p) return "Les hautes herbes sont calmes… Cherche un Pokémon d'Unys !"
   return p.captured
@@ -16,7 +16,8 @@ const message = computed(() => {
 })
 
 // Couleur de la barre comme une barre de PV : vert, puis jaune, puis rouge.
-const barClass = computed(() =>
+type BarClass = 'bar-high' | 'bar-mid' | 'bar-low'
+const barClass = computed<BarClass>(() =>
   props.stats.percent > 50
     ? 'bar-high'
     : props.stats.percent > 20

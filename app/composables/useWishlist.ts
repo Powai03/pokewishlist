@@ -1,12 +1,24 @@
 // État partagé de la wishlist + sauvegarde automatique dans le localStorage.
-import type { Pokemon } from '~/utils/wishlist'
+import type { ComputedRef, Ref } from 'vue'
+import type { Pokemon, WishlistItem, WishlistStats } from '~/types/pokemon'
 
 export const STORAGE_KEY = 'pokewishlist'
 
-export function useWishlist() {
-  const list = useState<Pokemon[]>('wishlist', () => [])
+/** Ce que renvoie `useWishlist()` : l'état de la liste et les actions possibles. */
+export interface UseWishlist {
+  list: Ref<WishlistItem[]>
+  ready: Ref<boolean>
+  stats: ComputedRef<WishlistStats>
+  has: (id: number) => boolean
+  add: (pokemon: Pokemon) => void
+  remove: (id: number) => void
+  toggle: (id: number) => void
+}
+
+export function useWishlist(): UseWishlist {
+  const list = useState<WishlistItem[]>('wishlist', () => [])
   // `ready` passe à true une fois la liste relue : évite d'afficher « liste vide » le temps du chargement.
-  const ready = useState('wishlist-ready', () => false)
+  const ready = useState<boolean>('wishlist-ready', () => false)
 
   // Le localStorage n'existe que dans le navigateur : on le lit après le montage, jamais côté serveur.
   onMounted(() => {
@@ -21,7 +33,7 @@ export function useWishlist() {
 
   watch(
     list,
-    (value) => {
+    (value: WishlistItem[]): void => {
       if (!ready.value) return
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
