@@ -84,11 +84,48 @@ jobs:
             test-results/
           retention-days: 7
 
-  # API (Hono + TypeScript), dans le dossier api/ : installation, vérifications, build,
-  # puis démarrage du vrai serveur et appel de GET /health (smoke test).
-  # ESLint et Prettier de la racine couvrent déjà api/ (checks ESLint et Prettier).
-  api:
-    name: API (Hono)
+  # ── API (Hono + TypeScript), dossier api/ : ses PROPRES outils (api/package.json) ──
+  # Même principe que le front : un check par outil, pour voir tout de suite lequel échoue.
+  api-check:
+    name: API · ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ESLint
+            script: lint
+            cmd: eslint . --max-warnings 0
+          - name: Prettier
+            script: format:check
+            cmd: prettier --check .
+          - name: TypeScript
+            script: typecheck
+            cmd: tsc --noEmit
+          - name: Vitest
+            script: test
+            cmd: vitest run
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Installer les dépendances (npm ci)
+        run: npm ci
+
+      - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
+        run: npm run ${{ matrix.script }}
+
+  # Build de l'API, puis démarrage du vrai serveur compilé et appel de GET /health (smoke test).
+  api-build:
+    name: API · Build + smoke test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -104,12 +141,6 @@ jobs:
 
       - name: Installer les dépendances (npm ci)
         run: npm ci
-
-      - name: tsc --noEmit (npm run typecheck)
-        run: npm run typecheck
-
-      - name: vitest run (npm run test)
-        run: npm run test
 
       - name: tsc -p tsconfig.build.json (npm run build)
         run: npm run build

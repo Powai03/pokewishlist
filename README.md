@@ -83,6 +83,9 @@ cd api
 npm install
 npm run dev        # http://localhost:3002/health (rechargement automatique)
 npm run test       # tests Vitest
+npm run lint       # ESLint
+npm run format     # Prettier (corrige) — format:check pour vérifier seulement
+npm run typecheck  # TypeScript
 npm run build      # compile src/ → dist/
 npm start          # lance dist/index.js
 ```
