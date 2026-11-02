@@ -1,5 +1,5 @@
 // Noms français et couleurs des types Pokémon (palette proche de celle des jeux).
-const TYPES: Record<string, { label: string, color: string }> = {
+const TYPES: Record<string, { label: string; color: string }> = {
   normal: { label: 'Normal', color: '#a8a878' },
   fire: { label: 'Feu', color: '#f08030' },
   water: { label: 'Eau', color: '#6890f0' },
@@ -20,6 +20,6 @@ const TYPES: Record<string, { label: string, color: string }> = {
   fairy: { label: 'Fée', color: '#ee99ac' },
 }
 
-export function typeInfo(type: string): { label: string, color: string } {
+export function typeInfo(type: string): { label: string; color: string } {
   return TYPES[type] ?? { label: type, color: '#888888' }
 }

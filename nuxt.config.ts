@@ -4,6 +4,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   compatibilityDate: '2025-07-15',
   eslint: {
-    config: { stylistic: true },
+    // La mise en forme est confiée à Prettier : on coupe les règles de style d'ESLint pour éviter qu'ils se contredisent.
+    config: { stylistic: false },
   },
 })

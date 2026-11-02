@@ -13,30 +13,38 @@ export function useWishlist() {
     if (ready.value) return
     try {
       list.value = parseStoredWishlist(localStorage.getItem(STORAGE_KEY))
-    }
-    catch {
+    } catch {
       list.value = [] // stockage bloqué (navigation privée stricte)
     }
     ready.value = true
   })
 
-  watch(list, (value) => {
-    if (!ready.value) return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-    }
-    catch {
-      // stockage indisponible : la liste reste en mémoire pour cette session
-    }
-  }, { deep: true })
+  watch(
+    list,
+    (value) => {
+      if (!ready.value) return
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+      } catch {
+        // stockage indisponible : la liste reste en mémoire pour cette session
+      }
+    },
+    { deep: true },
+  )
 
   return {
     list,
     ready,
     stats: computed(() => progress(list.value)),
-    has: (id: number) => list.value.some(p => p.id === id),
-    add: (pokemon: Pokemon) => { list.value = addPokemon(list.value, pokemon) },
-    remove: (id: number) => { list.value = removePokemon(list.value, id) },
-    toggle: (id: number) => { list.value = toggleCaptured(list.value, id) },
+    has: (id: number) => list.value.some((p) => p.id === id),
+    add: (pokemon: Pokemon) => {
+      list.value = addPokemon(list.value, pokemon)
+    },
+    remove: (id: number) => {
+      list.value = removePokemon(list.value, id)
+    },
+    toggle: (id: number) => {
+      list.value = toggleCaptured(list.value, id)
+    },
   }
 }

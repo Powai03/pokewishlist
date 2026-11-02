@@ -14,14 +14,18 @@ const error = ref('')
 onMounted(async () => {
   try {
     index.value = await fetchGen5Index()
-  }
-  catch {
+  } catch {
     indexError.value = true
   }
 })
 
 const results = computed(() => searchSpecies(index.value, query.value, 6))
-const noResult = computed(() => query.value.trim() !== '' && index.value.length > 0 && results.value.length === 0)
+const noResult = computed(
+  () =>
+    query.value.trim() !== '' &&
+    index.value.length > 0 &&
+    results.value.length === 0,
+)
 const label = (e: SpeciesEntry) => e.frName ?? e.name
 
 async function add(entry: SpeciesEntry) {
@@ -31,42 +35,27 @@ async function add(entry: SpeciesEntry) {
   try {
     emit('add', await fetchPokemon(entry))
     query.value = ''
-  }
-  catch {
+  } catch {
     error.value = `Impossible de récupérer ${label(entry)}. Réessaie.`
-  }
-  finally {
+  } finally {
     pendingId.value = null
   }
 }
 
 function addFirst() {
-  const first = results.value.find(r => !props.owned.includes(r.id))
+  const first = results.value.find((r) => !props.owned.includes(r.id))
   if (first) add(first)
 }
 </script>
 
 <template>
-  <section
-    class="dex"
-    aria-labelledby="dex-title"
-  >
-    <h2
-      id="dex-title"
-      class="dex-title"
-    >
-      Pokédex · Unys
-    </h2>
+  <section class="dex" aria-labelledby="dex-title">
+    <h2 id="dex-title" class="dex-title">Pokédex · Unys</h2>
 
-    <form
-      class="dex-form"
-      role="search"
-      @submit.prevent="addFirst"
-    >
-      <label
-        for="search-input"
-        class="sr-only"
-      >Nom ou numéro du Pokémon (494 à 649)</label>
+    <form class="dex-form" role="search" @submit.prevent="addFirst">
+      <label for="search-input" class="sr-only"
+        >Nom ou numéro du Pokémon (494 à 649)</label
+      >
       <input
         id="search-input"
         v-model="query"
@@ -74,27 +63,16 @@ function addFirst() {
         autocomplete="off"
         placeholder="Nom ou n° (ex. Vipélierre, 495)"
         :disabled="indexError"
-      >
+      />
     </form>
 
-    <p
-      v-if="indexError"
-      class="dex-msg dex-error"
-      role="alert"
-    >
+    <p v-if="indexError" class="dex-msg dex-error" role="alert">
       PokéAPI ne répond pas. Recharge la page dans un instant.
     </p>
-    <p
-      v-else-if="noResult"
-      class="dex-msg"
-    >
+    <p v-else-if="noResult" class="dex-msg">
       Aucun Pokémon d'Unys ne correspond (n° 494 à 649).
     </p>
-    <p
-      v-if="error"
-      class="dex-msg dex-error"
-      role="alert"
-    >
+    <p v-if="error" class="dex-msg dex-error" role="alert">
       {{ error }}
     </p>
 
@@ -103,10 +81,7 @@ function addFirst() {
       class="dex-list"
       aria-label="Résultats de recherche"
     >
-      <li
-        v-for="r in results"
-        :key="r.id"
-      >
+      <li v-for="r in results" :key="r.id">
         <button
           type="button"
           class="dex-item"
@@ -116,7 +91,13 @@ function addFirst() {
           <span class="dex-no">{{ String(r.id).padStart(3, '0') }}</span>
           <span class="dex-name">{{ label(r) }}</span>
           <span class="dex-action">
-            {{ owned.includes(r.id) ? 'Dans la boîte' : pendingId === r.id ? '…' : 'Ajouter' }}
+            {{
+              owned.includes(r.id)
+                ? 'Dans la boîte'
+                : pendingId === r.id
+                  ? '…'
+                  : 'Ajouter'
+            }}
           </span>
         </button>
       </li>
@@ -126,35 +107,97 @@ function addFirst() {
 
 <style scoped>
 .dex-title {
-  margin: 0 0 8px; font-size: 1rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  color: #fff; text-shadow: 2px 2px 0 #000;
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
 }
 .dex-form input {
-  width: 100%; padding: 10px 14px; font: inherit; font-size: 1.05rem; font-weight: 600; color: #2b2b2b;
-  background: #fff; border: 3px solid #2b2b2b; border-radius: 10px;
-  box-shadow: inset 0 0 0 2px #d8d8d8, 0 3px 0 #0006;
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #2b2b2b;
+  background: #fff;
+  border: 3px solid #2b2b2b;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 2px #d8d8d8,
+    0 3px 0 #0006;
 }
-.dex-form input:focus { outline: none; box-shadow: inset 0 0 0 2px #5ec8f2, 0 3px 0 #0006; }
-.dex-msg { margin: 8px 0 0; color: #dcdce4; font-weight: 600; }
-.dex-error { color: #ff8a78; }
+.dex-form input:focus {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 2px #5ec8f2,
+    0 3px 0 #0006;
+}
+.dex-msg {
+  margin: 8px 0 0;
+  color: #dcdce4;
+  font-weight: 600;
+}
+.dex-error {
+  color: #ff8a78;
+}
 
 /* Liste du Pokédex : lignes arrondies, le curseur ▶ apparaît sur la ligne survolée */
-.dex-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.dex-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
 .dex-item {
-  width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
-  padding: 8px 14px 8px 26px; font: inherit; color: #2b2b2b; position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 8px 14px 8px 26px;
+  font: inherit;
+  color: #2b2b2b;
+  position: relative;
   background: linear-gradient(#ffffff 0 50%, #ececec 50%);
-  border: 2px solid #2b2b2b; border-radius: 999px; box-shadow: 0 2px 0 #0006;
+  border: 2px solid #2b2b2b;
+  border-radius: 999px;
+  box-shadow: 0 2px 0 #0006;
 }
-.dex-item:not(:disabled):hover, .dex-item:not(:disabled):focus-visible {
-  background: linear-gradient(#bff0ff 0 50%, #8edcf8 50%); outline: none;
+.dex-item:not(:disabled):hover,
+.dex-item:not(:disabled):focus-visible {
+  background: linear-gradient(#bff0ff 0 50%, #8edcf8 50%);
+  outline: none;
 }
-.dex-item:not(:disabled):hover::before, .dex-item:not(:disabled):focus-visible::before {
-  content: '▶'; position: absolute; left: 9px; color: #e84830; font-size: 0.75em;
+.dex-item:not(:disabled):hover::before,
+.dex-item:not(:disabled):focus-visible::before {
+  content: '▶';
+  position: absolute;
+  left: 9px;
+  color: #e84830;
+  font-size: 0.75em;
 }
-.dex-item:disabled { opacity: 0.6; }
-.dex-no { font-weight: 700; color: #707078; min-width: 2.6em; }
-.dex-name { flex: 1; font-weight: 700; }
-.dex-action { font-size: 0.85rem; font-weight: 700; color: #1d78c8; }
-.dex-item:disabled .dex-action { color: #707078; }
+.dex-item:disabled {
+  opacity: 0.6;
+}
+.dex-no {
+  font-weight: 700;
+  color: #707078;
+  min-width: 2.6em;
+}
+.dex-name {
+  flex: 1;
+  font-weight: 700;
+}
+.dex-action {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1d78c8;
+}
+.dex-item:disabled .dex-action {
+  color: #707078;
+}
 </style>

@@ -33,7 +33,11 @@ export function idFromUrl(url: string): number {
 
 /** Minuscules sans accents : « Vipélierre » → « vipelierre » (pour comparer sans se soucier des accents). */
 export function fold(text: string): string {
-  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }
 
 /** Nettoie une saisie utilisateur : « Vipé  » → « vipe », « #0495 » → « 495 ». */
@@ -47,10 +51,14 @@ export function normalizeQuery(input: string): string {
  * sans tenir compte des accents ni des majuscules.
  * Le français passe avant l'anglais, et « commence par » avant « contient ».
  */
-export function searchSpecies(entries: SpeciesEntry[], input: string, limit = 8): SpeciesEntry[] {
+export function searchSpecies(
+  entries: SpeciesEntry[],
+  input: string,
+  limit = 8,
+): SpeciesEntry[] {
   const query = normalizeQuery(input)
   if (!query) return []
-  if (/^\d+$/.test(query)) return entries.filter(e => e.id === Number(query))
+  if (/^\d+$/.test(query)) return entries.filter((e) => e.id === Number(query))
   // Score : 0 = le nom français commence par la saisie, 1 = l'anglais commence,
   //         2 = le français la contient, 3 = l'anglais la contient, -1 = aucun rapport.
   const rank = (e: SpeciesEntry) => {
@@ -62,32 +70,40 @@ export function searchSpecies(entries: SpeciesEntry[], input: string, limit = 8)
     return -1
   }
   return entries
-    .map(e => ({ e, r: rank(e) }))
-    .filter(x => x.r >= 0)
+    .map((e) => ({ e, r: rank(e) }))
+    .filter((x) => x.r >= 0)
     .sort((a, b) => a.r - b.r) // tri stable : à score égal, l'ordre du Pokédex est conservé
     .slice(0, limit)
-    .map(x => x.e)
+    .map((x) => x.e)
 }
 
 /** Ajoute un Pokémon de 5e génération s'il n'y est pas déjà ; la liste reste triée par numéro. */
 export function addPokemon(list: Pokemon[], pokemon: Pokemon): Pokemon[] {
-  if (!isGen5(pokemon.id) || list.some(p => p.id === pokemon.id)) return list
+  if (!isGen5(pokemon.id) || list.some((p) => p.id === pokemon.id)) return list
   return [...list, pokemon].sort((a, b) => a.id - b.id)
 }
 
 export function removePokemon(list: Pokemon[], id: number): Pokemon[] {
-  return list.filter(p => p.id !== id)
+  return list.filter((p) => p.id !== id)
 }
 
 export function toggleCaptured(list: Pokemon[], id: number): Pokemon[] {
-  return list.map(p => (p.id === id ? { ...p, captured: !p.captured } : p))
+  return list.map((p) => (p.id === id ? { ...p, captured: !p.captured } : p))
 }
 
 /** Progression de la chasse : combien capturés sur combien, et le pourcentage arrondi. */
-export function progress(list: Pokemon[]): { captured: number, total: number, percent: number } {
+export function progress(list: Pokemon[]): {
+  captured: number
+  total: number
+  percent: number
+} {
   const total = list.length
-  const captured = list.filter(p => p.captured).length
-  return { captured, total, percent: total === 0 ? 0 : Math.round((captured / total) * 100) }
+  const captured = list.filter((p) => p.captured).length
+  return {
+    captured,
+    total,
+    percent: total === 0 ? 0 : Math.round((captured / total) * 100),
+  }
 }
 
 /**
@@ -98,8 +114,7 @@ export function parseStoredWishlist(raw: string | null): Pokemon[] {
   let data: unknown
   try {
     data = JSON.parse(raw ?? '[]')
-  }
-  catch {
+  } catch {
     return []
   }
   if (!Array.isArray(data)) return []
@@ -115,7 +130,9 @@ export function parseStoredWishlist(raw: string | null): Pokemon[] {
       frName: typeof p.frName === 'string' ? p.frName : p.name,
       sprite: typeof p.sprite === 'string' ? p.sprite : null,
       icon: typeof p.icon === 'string' ? p.icon : null,
-      types: Array.isArray(p.types) ? p.types.filter(t => typeof t === 'string') : [],
+      types: Array.isArray(p.types)
+        ? p.types.filter((t) => typeof t === 'string')
+        : [],
       captured: p.captured === true,
     })
   }
