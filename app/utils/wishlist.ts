@@ -12,6 +12,14 @@ import {
 /** 5e génération (région d'Unys, Pokémon Noir et Blanc) : de Victini (#494) à Genesect (#649). */
 export const GEN5 = { first: 494, last: 649 } as const
 
+/** Taille maximale de la wishlist : 6 Pokémon, comme une équipe dans le jeu. */
+export const WISHLIST_MAX = 6
+
+/** La wishlist a-t-elle atteint sa taille maximale ? */
+export function isFull(list: WishlistItem[]): boolean {
+  return list.length >= WISHLIST_MAX
+}
+
 export function isGen5(id: number): boolean {
   return Number.isInteger(id) && id >= GEN5.first && id <= GEN5.last
 }
@@ -80,15 +88,21 @@ export function searchSpecies(
 }
 
 /**
- * Ajoute un Pokémon de 5e génération s'il n'y est pas déjà ; la liste reste triée par numéro.
+ * Ajoute un Pokémon à la wishlist ; la liste reste triée par numéro.
  * Reçoit un `Pokemon` (données de l'API) et le transforme en `WishlistItem` (ajoute l'état de capture).
+ * Renvoie la liste INCHANGÉE si l'ajout est refusé :
+ * - Pokémon hors 5e génération ;
+ * - Pokémon déjà présent (pas de doublon) ;
+ * - liste pleine (WISHLIST_MAX = 6).
  */
 export function addPokemon(
   list: WishlistItem[],
   pokemon: Pokemon,
   captured: boolean = false,
 ): WishlistItem[] {
-  if (!isGen5(pokemon.id) || list.some((p) => p.id === pokemon.id)) return list
+  if (!isGen5(pokemon.id)) return list
+  if (list.some((p) => p.id === pokemon.id)) return list
+  if (isFull(list)) return list
   const item: WishlistItem = { ...pokemon, captured }
   return [...list, item].sort((a, b) => a.id - b.id)
 }

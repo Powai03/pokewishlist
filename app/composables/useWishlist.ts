@@ -9,6 +9,8 @@ export interface UseWishlist {
   list: Ref<WishlistItem[]>
   ready: Ref<boolean>
   stats: ComputedRef<WishlistStats>
+  /** `true` quand la wishlist contient déjà WISHLIST_MAX (6) Pokémon. */
+  full: ComputedRef<boolean>
   has: (id: number) => boolean
   add: (pokemon: Pokemon) => void
   remove: (id: number) => void
@@ -48,6 +50,7 @@ export function useWishlist(): UseWishlist {
     list,
     ready,
     stats: computed(() => progress(list.value)),
+    full: computed(() => isFull(list.value)),
     has: (id: number) => list.value.some((p) => p.id === id),
     add: (pokemon: Pokemon) => {
       list.value = addPokemon(list.value, pokemon)

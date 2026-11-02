@@ -12,13 +12,30 @@ concurrency:
 
 jobs:
   # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ le job e2e plus bas).
+  # Chaque check porte le nom de son OUTIL ; `cmd` affiche la commande réellement lancée
+  # (celle du script npm correspondant dans package.json).
   check:
-    name: ${{ matrix.task }}
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false # un check rouge n'arrête pas les autres
       matrix:
-        task: [lint, format:check, typecheck, test, build]
+        include:
+          - name: ESLint
+            script: lint
+            cmd: eslint . --max-warnings 0
+          - name: Prettier
+            script: format:check
+            cmd: prettier --check .
+          - name: TypeScript
+            script: typecheck
+            cmd: nuxt typecheck
+          - name: Vitest
+            script: test
+            cmd: vitest run
+          - name: Build Nuxt
+            script: build
+            cmd: nuxt build
     steps:
       - uses: actions/checkout@v4
 
@@ -30,12 +47,12 @@ jobs:
       - name: Installer les dépendances
         run: npm ci # installe exactement les versions du package-lock.json
 
-      - name: npm run ${{ matrix.task }}
-        run: npm run ${{ matrix.task }}
+      - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
+        run: npm run ${{ matrix.script }}
 
   # Test de bout en bout : un vrai navigateur ajoute un Pokémon, rafraîchit, vérifie la liste.
   e2e:
-    name: e2e
+    name: Playwright (E2E)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +71,7 @@ jobs:
       - name: Build de l'application
         run: npm run build
 
-      - name: Tests E2E
+      - name: playwright test (npm run e2e)
         run: npm run e2e
 
       - name: Rapport Playwright (si échec)

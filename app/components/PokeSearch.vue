@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Pokemon, SpeciesEntry } from '~/types/pokemon'
 
-const props = defineProps<{ owned: number[] }>()
+const props = defineProps<{ owned: number[]; full: boolean }>()
 const emit = defineEmits<{ add: [pokemon: Pokemon] }>()
 
 const index = ref<SpeciesEntry[]>([])
@@ -31,7 +31,7 @@ const noResult = computed<boolean>(
 const label = (e: SpeciesEntry): string => e.frName ?? e.name
 
 async function add(entry: SpeciesEntry): Promise<void> {
-  if (props.owned.includes(entry.id) || pendingId.value) return
+  if (props.full || props.owned.includes(entry.id) || pendingId.value) return
   pendingId.value = entry.id
   error.value = ''
   try {
@@ -74,6 +74,10 @@ function addFirst(): void {
     <p v-else-if="noResult" class="dex-msg">
       Aucun Pokémon d'Unys ne correspond (n° 494 à 649).
     </p>
+    <p v-if="full" class="dex-msg dex-full" role="status">
+      Boîte pleine ({{ WISHLIST_MAX }}/{{ WISHLIST_MAX }}) : retire un Pokémon
+      pour en ajouter un autre.
+    </p>
     <p v-if="error" class="dex-msg dex-error" role="alert">
       {{ error }}
     </p>
@@ -87,7 +91,7 @@ function addFirst(): void {
         <button
           type="button"
           class="dex-item"
-          :disabled="owned.includes(r.id) || pendingId !== null"
+          :disabled="full || owned.includes(r.id) || pendingId !== null"
           @click="add(r)"
         >
           <span class="dex-no">{{ String(r.id).padStart(3, '0') }}</span>
@@ -96,9 +100,11 @@ function addFirst(): void {
             {{
               owned.includes(r.id)
                 ? 'Dans la boîte'
-                : pendingId === r.id
-                  ? '…'
-                  : 'Ajouter'
+                : full
+                  ? 'Boîte pleine'
+                  : pendingId === r.id
+                    ? '…'
+                    : 'Ajouter'
             }}
           </span>
         </button>
@@ -198,6 +204,9 @@ function addFirst(): void {
   font-size: 0.85rem;
   font-weight: 700;
   color: #1d78c8;
+}
+.dex-full {
+  color: #f8d878;
 }
 .dex-item:disabled .dex-action {
   color: #707078;

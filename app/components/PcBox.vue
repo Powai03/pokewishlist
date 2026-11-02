@@ -15,7 +15,7 @@ defineEmits<{ select: [id: number] }>()
     <h2 id="pc-title" class="pc-title">
       <span aria-hidden="true">◀</span>
       Boîte · À capturer
-      <span class="pc-count">{{ list.length }}</span>
+      <span class="pc-count">{{ list.length }}/{{ WISHLIST_MAX }}</span>
       <span aria-hidden="true">▶</span>
     </h2>
 

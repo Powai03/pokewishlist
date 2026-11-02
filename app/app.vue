@@ -14,7 +14,7 @@ useHead({
   ],
 })
 
-const { list, ready, stats, add, remove, toggle } = useWishlist()
+const { list, ready, stats, full, add, remove, toggle } = useWishlist()
 const owned = computed<number[]>(() => list.value.map((p) => p.id))
 
 // Pokémon affiché sur l'écran du haut : celui qu'on a choisi, sinon le premier de la boîte.
@@ -78,7 +78,7 @@ function onAdd(pokemon: Pokemon): void {
             </button>
           </div>
 
-          <PokeSearch :owned="owned" @add="onAdd" />
+          <PokeSearch :owned="owned" :full="full" @add="onAdd" />
 
           <PcBox
             :list="list"
