@@ -83,3 +83,53 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # API (Hono + TypeScript), dans le dossier api/ : installation, vérifications, build,
+  # puis démarrage du vrai serveur et appel de GET /health (smoke test).
+  # ESLint et Prettier de la racine couvrent déjà api/ (checks ESLint et Prettier).
+  api:
+    name: API (Hono)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Installer les dépendances (npm ci)
+        run: npm ci
+
+      - name: tsc --noEmit (npm run typecheck)
+        run: npm run typecheck
+
+      - name: vitest run (npm run test)
+        run: npm run test
+
+      - name: tsc -p tsconfig.build.json (npm run build)
+        run: npm run build
+
+      - name: "Smoke test : démarrer l'API et appeler GET /health"
+        env:
+          NODE_ENV: production
+          PORT: 3002
+        run: |
+          # Le serveur écrit dans server.log et est TOUJOURS arrêté à la fin (succès ou échec).
+          node dist/index.js > server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID; echo "--- journal du serveur"; cat server.log' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            http://localhost:3002/health | tee health.json
+          echo
+          node -e '
+            const health = JSON.parse(require("fs").readFileSync("health.json", "utf8"))
+            const { version } = JSON.parse(require("fs").readFileSync("package.json", "utf8"))
+            const ok = health.status === "ok" && health.env === "production" && health.version === version
+            if (!ok) { console.error("Réponse /health inattendue :", health); process.exit(1) }
+            console.log(`OK : status=${health.status}, version=${health.version}, env=${health.env}`)
+          '

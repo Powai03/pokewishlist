@@ -1,2 +1,3 @@
 # Prettier ignore déjà ce qui est dans .gitignore (node_modules, .nuxt, .output…)
 package-lock.json
+api/package-lock.json
