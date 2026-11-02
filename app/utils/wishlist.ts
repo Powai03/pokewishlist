@@ -123,7 +123,7 @@ export function toggleCaptured(
 
 /** Progression de la chasse : combien capturés sur combien, et le pourcentage arrondi. */
 export function progress(list: WishlistItem[]): WishlistStats {
-  const total = list.length
+  const total: string = list.length
   const captured = list.filter((p) => p.captured).length
   return {
     captured,
