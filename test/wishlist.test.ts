@@ -5,7 +5,6 @@ import {
   idFromUrl,
   isGen5,
   normalizeQuery,
-  parseStoredWishlist,
   progress,
   removePokemon,
   searchSpecies,
@@ -218,40 +217,5 @@ describe('progress', () => {
       make(501, 'oshawott'),
     ]
     expect(progress(list)).toEqual({ captured: 1, total: 3, percent: 33 })
-  })
-})
-
-describe('parseStoredWishlist (relecture du localStorage)', () => {
-  it("relit une liste sauvegardée à l'identique", () => {
-    const saved = [vipelierre, { ...gruikui, captured: true }]
-    expect(parseStoredWishlist(JSON.stringify(saved))).toEqual(saved)
-  })
-  it("renvoie une liste vide si rien n'est sauvegardé ou si le JSON est cassé", () => {
-    expect(parseStoredWishlist(null)).toEqual([])
-    expect(parseStoredWishlist('{pas du json')).toEqual([])
-    expect(parseStoredWishlist('"texte"')).toEqual([])
-  })
-  it('ne garde que les types valides', () => {
-    const raw = JSON.stringify([
-      { ...vipelierre, types: ['grass', 'plante', 7] },
-    ])
-    expect(parseStoredWishlist(raw)[0]?.types).toEqual(['grass'])
-  })
-  it('ne relit que 6 Pokémon même si le stockage en contient plus', () => {
-    const ids = [494, 495, 496, 497, 498, 499, 500, 501]
-    const raw = JSON.stringify(ids.map((id) => make(id, `p${id}`)))
-    expect(parseStoredWishlist(raw)).toHaveLength(WISHLIST_MAX)
-  })
-  it('écarte les entrées invalides et hors 5e génération', () => {
-    const raw = JSON.stringify([
-      vipelierre,
-      pikachu,
-      null,
-      { id: 'x' },
-      { id: 501, name: 'oshawott' },
-    ])
-    const list = parseStoredWishlist(raw)
-    expect(list.map((p) => p.id)).toEqual([495, 501])
-    expect(list[1]).toEqual(make(501, 'oshawott')) // champs manquants complétés
   })
 })

@@ -131,35 +131,3 @@ export function progress(list: WishlistItem[]): WishlistStats {
     percent: total === 0 ? 0 : Math.round((captured / total) * 100),
   }
 }
-
-/**
- * Relit la liste sauvegardée dans le localStorage SANS lui faire confiance :
- * JSON cassé, données d'une ancienne version ou Pokémon hors 5e génération sont écartés.
- * Les données arrivent en `unknown` : chaque champ est vérifié avant d'être utilisé.
- */
-export function parseStoredWishlist(raw: string | null): WishlistItem[] {
-  let data: unknown
-  try {
-    data = JSON.parse(raw ?? '[]')
-  } catch {
-    return []
-  }
-  if (!Array.isArray(data)) return []
-
-  let list: WishlistItem[] = []
-  for (const item of data as unknown[]) {
-    if (typeof item !== 'object' || item === null) continue
-    const p = item as Partial<Record<keyof WishlistItem, unknown>>
-    if (typeof p.id !== 'number' || typeof p.name !== 'string') continue
-    const pokemon: Pokemon = {
-      id: p.id,
-      name: p.name,
-      frName: typeof p.frName === 'string' ? p.frName : p.name,
-      sprite: typeof p.sprite === 'string' ? p.sprite : null,
-      icon: typeof p.icon === 'string' ? p.icon : null,
-      types: Array.isArray(p.types) ? p.types.filter(isPokemonType) : [],
-    }
-    list = addPokemon(list, pokemon, p.captured === true)
-  }
-  return list
-}
