@@ -100,3 +100,22 @@ npm start          # lance dist/index.js
 ```
 
 Variables d'environnement : `PORT` (3002 par défaut), `NODE_ENV` (`development`, `test` ou `production`).
+
+### Routes
+
+| Méthode  | Route           | Succès                                    | Erreurs                                             |
+| -------- | --------------- | ----------------------------------------- | --------------------------------------------------- |
+| `GET`    | `/health`       | `200` état, version, environnement        |                                                     |
+| `GET`    | `/wishlist`     | `200` liste des Pokémon                   |                                                     |
+| `POST`   | `/wishlist`     | `201` Pokémon créé (+ en-tête `Location`) | `400` corps invalide, `409` doublon ou liste pleine |
+| `DELETE` | `/wishlist/:id` | `200` Pokémon retiré                      | `400` id invalide, `404` absent de la liste         |
+
+Corps de `POST /wishlist` : `{ "id": 495, "name": "Vipélierre" }` (5e génération : 494 à 649, 6 Pokémon maximum).
+
+La wishlist est stockée **en mémoire** : elle est vidée à chaque redémarrage de l'API.
+
+```bash
+curl -X POST localhost:3002/wishlist -H 'content-type: application/json' -d '{"id":495,"name":"Vipélierre"}'
+curl localhost:3002/wishlist
+curl -X DELETE localhost:3002/wishlist/495
+```

@@ -2,6 +2,8 @@
 // Séparée de index.ts pour pouvoir la tester avec `app.request()` (aucun port réseau ouvert).
 import { Hono } from 'hono'
 import type { AppConfig, AppEnv } from './config.js'
+import { wishlistRoutes } from './routes/wishlist.js'
+import { WishlistStore } from './wishlist-store.js'
 
 /** Réponse de GET /health. */
 export interface HealthResponse {
@@ -14,7 +16,14 @@ export interface HealthResponse {
   timestamp: string
 }
 
-export function createApp(config: Pick<AppConfig, 'version' | 'env'>): Hono {
+/**
+ * Crée l'application. Le stockage est passé en paramètre (injection de dépendance) :
+ * chaque test peut ainsi partir d'une wishlist vide, sans influencer les autres.
+ */
+export function createApp(
+  config: Pick<AppConfig, 'version' | 'env'>,
+  store: WishlistStore = new WishlistStore(),
+): Hono {
   const app = new Hono()
   const startedAt = Date.now()
 
@@ -30,6 +39,8 @@ export function createApp(config: Pick<AppConfig, 'version' | 'env'>): Hono {
     }
     return c.json(body)
   })
+
+  app.route('/wishlist', wishlistRoutes(store))
 
   // Toute autre route : 404 en JSON (plutôt qu'une page texte).
   app.notFound((c) => c.json({ error: 'Not Found', path: c.req.path }, 404))
