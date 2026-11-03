@@ -26,7 +26,12 @@ export default defineNuxtConfig({
   // servies sans calcul ni appel à PokéAPI). Les autres adresses (/pokemon/495…) restent rendues à la demande (SSR).
   nitro: {
     prerender: {
-      routes: gen5.map((p) => `/pokemon/${p.name}`),
+      // Version statique (SSG, S3 + CloudFront : NITRO_PRESET=static) : l'accueil est généré aussi.
+      // En SSR (Vercel), il reste rendu à la demande (lecture du cookie de langue côté serveur).
+      routes: [
+        ...(process.env.NITRO_PRESET === 'static' ? ['/'] : []),
+        ...gen5.map((p) => `/pokemon/${p.name}`),
+      ],
       crawlLinks: false, // seulement ces 156 pages (pas les liens « N°494 ◀ ▶ N°496 » en double)
       concurrency: 8, // 8 pages à la fois (2 appels PokéAPI chacune)
       failOnError: true, // une fiche en erreur fait échouer le build (et donc la CI)
