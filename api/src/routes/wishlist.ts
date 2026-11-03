@@ -19,7 +19,13 @@ export interface ErrorResponse {
 export function wishlistRoutes(store: WishlistStore): Hono {
   const routes = new Hono()
 
-  routes.get('/', (c) => c.json(store.list(), 200))
+  // PANNE VOLONTAIRE : la liste ne renvoie plus le nom français (frName).
+  routes.get('/', (c) =>
+    c.json(
+      store.list().map((item) => ({ ...item, frName: undefined })),
+      200,
+    ),
+  )
 
   routes.post('/', async (c) => {
     // 1. Lire le JSON : un corps illisible est une erreur du client (400), pas un plantage (500).
