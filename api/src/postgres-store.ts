@@ -68,6 +68,10 @@ export interface PostgresStoreOptions {
   ssl?: boolean
   /** Nombre maximal de connexions simultanées (défaut : 5). */
   max?: number
+  /** Ferme une connexion inutilisée depuis ce nombre de secondes (défaut : jamais). */
+  idleTimeout?: number
+  /** Renouvelle toute connexion plus vieille que ce nombre de secondes (défaut : 30 à 60 min). */
+  maxLifetime?: number
 }
 
 export class PostgresWishlistStore implements WishlistStore {
@@ -79,6 +83,8 @@ export class PostgresWishlistStore implements WishlistStore {
       max: options.max ?? 5, // l'offre gratuite de Supabase limite le nombre de connexions
       ssl: options.ssl === false ? false : 'require', // chiffrée : le mot de passe ne circule pas en clair
       prepare: false, // compatible avec le pooler de Supabase en mode « transaction »
+      idle_timeout: options.idleTimeout,
+      ...(options.maxLifetime ? { max_lifetime: options.maxLifetime } : {}),
       onnotice: () => {}, // ignore les messages d'information de PostgreSQL (« NOTICE »)
     })
   }
