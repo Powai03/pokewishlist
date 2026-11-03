@@ -163,6 +163,16 @@ Adresse publique : **API Gateway (HTTP API)** `https://r3as2k0zxl.execute-api.eu
 - Mise en place, une seule fois : `bash infra/aws-setup.sh` (AWS CLI connecté), puis créer l'environnement `production` dans GitHub avec les valeurs affichées par le script (`AWS_ROLE_ARN` ; variables `AWS_REGION`, `LAMBDA_FUNCTION_NAME`, `API_URL`).
 - Relance manuelle : onglet **Actions → CD → Run workflow** (depuis `main`).
 
+## Déploiement continu du front (Nuxt SSR) sur Vercel
+
+Site en ligne : **https://pokewishlist-nu.vercel.app** (rendu serveur, régions `dub1`).
+
+Après chaque merge dans `main` et une CI verte, le workflow CD déploie d'abord l'API (AWS), puis le front : `vercel build --prod` dans GitHub Actions (preset Nitro `vercel`, adresse de l'API gravée au build), `vercel deploy --prebuilt --prod`, puis vérification que le HTML rendu par le serveur porte le commit déployé (`<meta name="app-commit">`, aussi affiché en bas de page).
+
+- Le déploiement automatique de Vercel est coupé (`vercel.json` : `git.deploymentEnabled: false`) : seul GitHub Actions déploie, après la CI.
+- Environnement GitHub `production` : secret `VERCEL_TOKEN` ; variables `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `FRONT_URL`.
+- L'adresse du site est dans le CORS de l'API (`CORS_ORIGIN`, `infra/aws-setup.sh`).
+
 ## Lancer le front avec l'API
 
 Le front lit et enregistre la wishlist via l'API (plus de localStorage). Dans deux terminaux :

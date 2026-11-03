@@ -141,3 +141,79 @@ jobs:
           fi
           echo "CORS (OPTIONS /wishlist) → autorisé pour http://localhost:3001"
           echo "✔ L'API en ligne exécute le commit $DEPLOY_SHA et ses routes répondent"
+
+  # Front Nuxt (rendu serveur, SSR) sur Vercel, APRÈS l'API (le nouveau front peut avoir besoin de la nouvelle API).
+  # Le déploiement automatique de Vercel à chaque push est coupé (vercel.json) : c'est CE job qui déploie,
+  # et seulement après une CI verte. Identifiant Vercel : jeton dans les secrets de l'environnement production.
+  deploy-front:
+    name: Déployer le front (Nuxt SSR) sur Vercel
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.FRONT_URL }}
+    permissions:
+      contents: read
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      FRONT_URL: ${{ vars.FRONT_URL }}
+      API_URL: ${{ vars.API_URL }}
+      # Lus par le CLI Vercel : quel compte, quel projet.
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_CLI: vercel@65.10.0
+    steps:
+      - name: Vérifier la configuration (variables et secret de l'environnement production)
+        run: |
+          missing=0
+          for name in FRONT_URL API_URL VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN; do
+            if [ -z "${!name}" ]; then echo "::error::Manquant : $name"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Installer les dépendances (npm ci)
+        run: npm ci
+
+      - name: '[1/4] Récupérer la configuration du projet Vercel'
+        run: npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: '[2/4] Construire le site (nuxt build, preset Vercel, commit ${{ env.DEPLOY_SHA }})'
+        env:
+          GIT_COMMIT: ${{ env.DEPLOY_SHA }}
+          NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }}
+        run: npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+
+      - name: '[3/4] Mettre en ligne (production)'
+        run: |
+          url=$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "Déploiement : $url"
+
+      - name: '[4/4] Vérifier en ligne : le HTML rendu par le serveur porte ce commit'
+        run: |
+          # curl ne lance aucun JavaScript : ce qu'il reçoit est bien le rendu SERVEUR (SSR).
+          for i in $(seq 1 10); do
+            html=$(curl --silent --max-time 20 "$FRONT_URL/" || true)
+            commit=$(printf '%s' "$html" | grep -o '<meta name="app-commit" content="[0-9a-f]*"' | sed 's/.*content="//; s/"$//')
+            echo "[$i/10] $FRONT_URL/ → commit ${commit:-?}"
+            [ "$commit" = "$DEPLOY_SHA" ] && break
+            sleep 5
+          done
+          if [ "$commit" != "$DEPLOY_SHA" ]; then
+            echo "::error::Le site en ligne ne porte pas le commit déployé ($DEPLOY_SHA)"; exit 1
+          fi
+          # Une fiche rendue par le serveur : données PokéAPI déjà dans le HTML.
+          code=$(curl --silent --max-time 20 -o fiche.html -w '%{http_code}' "$FRONT_URL/pokemon/495")
+          grep -q 'Snivy' fiche.html || { echo "::error::/pokemon/495 → $code, sans « Snivy » dans le HTML"; exit 1; }
+          echo "GET /pokemon/495 → $code, fiche rendue par le serveur"
+          echo "✔ Le site en ligne exécute le commit $DEPLOY_SHA"
