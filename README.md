@@ -152,6 +152,15 @@ curl -X DELETE http://localhost:3002/wishlist/495 -H "Accept-Language: fr"
 # {"error":"Le Pokémon #495 n'est pas dans la wishlist","code":"notInList"}
 ```
 
+## Déploiement continu (CD) de l'API sur AWS Lambda
+
+Après chaque merge dans `main`, si **toute la CI est verte**, le workflow `.github/workflows/cd.yml` construit l'API en un seul fichier (`npm --prefix api run build:lambda`), l'envoie sur la fonction Lambda, puis vérifie en ligne que `GET /health` renvoie bien le commit déployé (champ `commit`).
+
+- Connexion à AWS par **OIDC** : aucune clé AWS dans GitHub, seulement l'identifiant d'un rôle (secret `AWS_ROLE_ARN`) qui ne peut que mettre à jour le code de cette fonction, et seulement depuis l'environnement GitHub `production`.
+- `DATABASE_URL` reste côté AWS (configuration de la fonction), jamais dans GitHub.
+- Mise en place, une seule fois : `bash infra/aws-setup.sh` (AWS CLI connecté), puis créer l'environnement `production` dans GitHub avec les valeurs affichées par le script (`AWS_ROLE_ARN` ; variables `AWS_REGION`, `LAMBDA_FUNCTION_NAME`, `API_URL`).
+- Relance manuelle : onglet **Actions → CD → Run workflow** (depuis `main`).
+
 ## Lancer le front avec l'API
 
 Le front lit et enregistre la wishlist via l'API (plus de localStorage). Dans deux terminaux :

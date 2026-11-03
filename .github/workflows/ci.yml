@@ -273,3 +273,12 @@ jobs:
             if (!ok) { console.error("Réponse /health inattendue :", health); process.exit(1) }
             console.log(`OK : status=${health.status}, version=${health.version}, env=${health.env}`)
           '
+
+      # Le paquet déployé sur AWS Lambda par le workflow CD : construit et appelé ici, sans AWS.
+      # Une CI verte garantit donc que le paquet fonctionne AVANT tout déploiement.
+      - name: Paquet AWS Lambda (npm run build:lambda) + appel du handler
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          npm run build:lambda
+          node scripts/invoke-lambda.mjs "$GIT_COMMIT"

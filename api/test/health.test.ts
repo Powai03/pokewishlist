@@ -29,6 +29,18 @@ describe('GET /health', () => {
     expect(new Date(body.timestamp).toISOString()).toBe(body.timestamp)
   })
 
+  it('indique le commit déployé (« local » hors déploiement)', async () => {
+    const body = (await (await app.request('/health')).json()) as HealthResponse
+    expect(body.commit).toBe('local')
+    const deployed = createApp({
+      version: '1.2.3',
+      env: 'test',
+      commit: 'abc123',
+    })
+    const res = await deployed.request('/health')
+    expect(((await res.json()) as HealthResponse).commit).toBe('abc123')
+  })
+
   it('indique le stockage utilisé (mémoire par défaut)', async () => {
     const body = (await (await app.request('/health')).json()) as HealthResponse
     expect(body.storage).toBe('memory')
@@ -79,6 +91,11 @@ describe('configuration', () => {
       env: 'production',
       port: 4000,
     })
+  })
+
+  it('GIT_COMMIT → commit affiché par /health ; absent → « local »', () => {
+    expect(loadConfig({ GIT_COMMIT: ' abc123 ' }).commit).toBe('abc123')
+    expect(loadConfig({}).commit).toBe('local')
   })
 
   it('DATABASE_URL absente ou vide → pas de base (stockage en mémoire)', () => {

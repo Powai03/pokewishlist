@@ -14,6 +14,8 @@ export type StorageKind = 'memory' | 'postgres'
 export interface HealthResponse {
   status: 'ok'
   version: string
+  /** Commit git déployé (« local » hors déploiement) : permet de vérifier qu'une mise en ligne a bien eu lieu. */
+  commit: string
   env: AppEnv
   /** Où la wishlist est rangée : « postgres » (Supabase) ou « memory » (tableau, perdu au redémarrage). */
   storage: StorageKind
@@ -29,7 +31,7 @@ export interface HealthResponse {
  */
 export function createApp(
   config: Pick<AppConfig, 'version' | 'env'> &
-    Partial<Pick<AppConfig, 'corsOrigins'>>,
+    Partial<Pick<AppConfig, 'corsOrigins' | 'commit'>>,
   store: WishlistStore = new MemoryWishlistStore(),
   storage: StorageKind = 'memory',
 ): Hono {
@@ -77,6 +79,7 @@ export function createApp(
     const body: HealthResponse = {
       status: 'ok',
       version: config.version,
+      commit: config.commit ?? 'local',
       env: config.env,
       storage,
       uptime: Math.round((Date.now() - startedAt) / 1000),
