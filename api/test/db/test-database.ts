@@ -65,7 +65,7 @@ export async function startTestDatabase(): Promise<TestDatabase> {
     const port = await freePort()
     const server = new PGLiteSocketServer({ db, port, maxConnections: 10 })
     await server.start()
-    url = `postgresql://postgres:postgres@127.0.0.1:${port}/postgres`
+    url = `postgresql://postgres@127.0.0.1:${port}/postgres` // PGlite : pas de mot de passe
     kind = 'PGlite (PostgreSQL en mémoire)'
     stopEngine = async () => {
       await server.stop()

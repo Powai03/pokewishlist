@@ -82,8 +82,9 @@ describe('configuration', () => {
     expect(loadConfig({}).databaseUrl).toBeUndefined()
     expect(loadConfig({ DATABASE_URL: '  ' }).databaseUrl).toBeUndefined()
     expect(
-      loadConfig({ DATABASE_URL: 'postgresql://u:p@h/db' }).databaseUrl,
-    ).toBe('postgresql://u:p@h/db')
+      loadConfig({ DATABASE_URL: 'postgresql://db.local/wishlist' })
+        .databaseUrl,
+    ).toBe('postgresql://db.local/wishlist')
   })
 
   it.each([

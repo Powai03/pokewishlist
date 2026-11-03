@@ -69,11 +69,11 @@ describe('base de test isolée', () => {
   it('refuse une base distante (les tests effacent la table)', () => {
     expect(() =>
       assertLocalDatabase(
-        'postgresql://u:p@aws-0-eu-west-1.pooler.supabase.com:5432/postgres',
+        'postgresql://aws-0-eu-west-1.pooler.supabase.com:5432/postgres',
       ),
     ).toThrow(/locale/)
     expect(() =>
-      assertLocalDatabase('postgresql://u:p@127.0.0.1:5432/x'),
+      assertLocalDatabase('postgresql://127.0.0.1:5432/x'),
     ).not.toThrow()
   })
 })
