@@ -1,103 +1,265 @@
-name: CI
+name: CI/CD
 
-# Se déclenche à chaque push (toutes branches) et à chaque Pull Request.
+# Un seul pipeline, en étapes reliées par `needs:` (GitHub les dessine en graphe dans l'onglet Actions) :
+#
+#   i18n ───────────┬──────────────────────────────────────────────┐
+#   API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬─▶ API · Build + /health ─┐
+#                   └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E ─▶ Deploy API ─▶ Deploy (Vercel)
+#   Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘     (main uniquement)
+#
+# · Un job ne démarre que si ceux dont il dépend ont RÉUSSI : un check rouge arrête la suite.
+# · Les déploiements ne tournent que sur un push dans main (donc après un merge), jamais pour une PR.
 on:
   push:
   pull_request:
 
-# Si on repousse sur la même branche, on annule l'exécution précédente devenue inutile.
+# Une PR repoussée annule son exécution précédente. Sur main, jamais : on n'interrompt pas un déploiement.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Droits minimaux par défaut (lecture du code) ; le déploiement AWS demande en plus son jeton OIDC.
+permissions:
+  contents: read
 
 jobs:
-  # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ traductions, e2e et API plus bas).
-  # Chaque check porte le nom de son OUTIL ; `cmd` affiche la commande réellement lancée
-  # (celle du script npm correspondant dans package.json).
+  # ── Étape 1 : installer une fois, mettre en cache ─────────────────────────────────────────────
+  # node_modules est mis en cache (clé = package-lock.json) ; les jobs suivants le récupèrent
+  # au lieu de relancer `npm ci` chacun de leur côté.
+  install:
+    name: Install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: cache
+        uses: actions/cache@v6
+        with:
+          path: ./node_modules
+          key: node-modules-${{ runner.os }}-node24-.-${{ hashFiles('./package-lock.json') }}
+      - name: npm ci (versions exactes du package-lock.json)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+  api-install:
+    name: API · Install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: cache
+        uses: actions/cache@v6
+        with:
+          path: api/node_modules
+          key: node-modules-${{ runner.os }}-node24-api-${{ hashFiles('api/package-lock.json') }}
+      - name: npm ci (api/)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: api
+
+  # Traductions : chaque fichier de langue (front i18n/locales, API api/src/locales) doit avoir
+  # exactement les clés de en.json. Aucune dépendance : Node seul, quelques secondes.
+  locales:
+    name: i18n (clés des locales)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: node scripts/check-locales.mjs (npm run check:locales)
+        run: node scripts/check-locales.mjs
+
+  # ── Étape 2 : contrôles de qualité, en parallèle (un check par outil) ─────────────────────────
   check:
     name: ${{ matrix.name }}
+    needs: install
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false # un check rouge n'arrête pas les autres
       matrix:
         include:
-          - name: ESLint
-            script: lint
-            cmd: eslint . --max-warnings 0
-          - name: Prettier
+          - name: Format (Prettier)
             script: format:check
-            cmd: prettier --check .
-          - name: TypeScript
+          - name: Lint (ESLint)
+            script: lint
+          - name: Typecheck
             script: typecheck
-            cmd: nuxt typecheck
-          - name: Vitest
+          - name: Tests (Vitest)
             script: test
-            cmd: vitest run
-          - name: Build Nuxt
-            script: build
-            cmd: nuxt build
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-modules
         with:
-          node-version: 24
-          cache: npm
-
-      - name: Installer les dépendances
-        run: npm ci # installe exactement les versions du package-lock.json
-
-      - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
+          nuxt-prepare: 'true'
+      - name: npm run ${{ matrix.script }}
         run: npm run ${{ matrix.script }}
 
-  # Traductions : chaque fichier de langue (front i18n/locales, API api/src/locales) doit avoir
-  # exactement les clés de en.json. Une clé manquante → le script sort en code 1 → check rouge.
-  # Aucune dépendance : pas de `npm ci`, le job dure quelques secondes.
-  locales:
-    name: Traductions (clés vs en.json)
+  api-check:
+    name: API · ${{ matrix.name }}
+    needs: api-install
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: node scripts/check-locales.mjs (npm run check:locales)
-        run: node scripts/check-locales.mjs
-
-  # Test de bout en bout : un vrai navigateur ajoute un Pokémon, rafraîchit, vérifie la liste.
-  # Le front buildé parle à la VRAIE API buildée (playwright.config.ts démarre les deux serveurs).
-  e2e:
-    name: Playwright (E2E)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            api/package-lock.json
-
-      - name: Installer les dépendances
-        run: npm ci
-
-      - name: Installer les dépendances de l'API
-        run: npm ci
+    defaults:
+      run:
         working-directory: api
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Format (Prettier)
+            script: format:check
+          - name: Lint (ESLint)
+            script: lint
+          - name: Typecheck
+            script: typecheck
+          - name: Tests (Vitest)
+            script: test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-modules
+        with:
+          dir: api
+      - name: npm run ${{ matrix.script }}
+        run: npm run ${{ matrix.script }}
+
+  # Tests d'intégration du stockage sur un VRAI serveur PostgreSQL 17 (même version que Supabase),
+  # lancé à côté du job (« service container ») : base jetable, isolée, détruite à la fin du job.
+  # Le schéma vient de supabase/init.sql ; aucun mock SQL. (En local, ces tests utilisent PGlite.)
+  api-db:
+    name: API · Tests BDD (Postgres)
+    needs: api-install
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # Base jetable, joignable seulement depuis ce job : connexion sans mot de passe (« trust »).
+          # Aucun mot de passe dans le dépôt → rien que GitGuardian puisse signaler.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-modules
+        with:
+          dir: api
+      - name: vitest run test/db (npm run test:db)
+        run: npm run test:db
+
+  # ── Étape 3 : builds (seulement si les contrôles sont verts) ──────────────────────────────────
+  build:
+    name: Build
+    needs: [check, locales]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-modules
+      - name: nuxt build (npm run build)
+        run: npm run build
+      # Le site compilé est transmis au job E2E (pas de 2e build).
+      - uses: actions/upload-artifact@v7
+        with:
+          name: front-build
+          path: .output/
+          include-hidden-files: true
+          retention-days: 1
+
+  # Build de l'API, démarrage du vrai serveur compilé et appel de GET /health (smoke test),
+  # puis paquet AWS Lambda construit et appelé sans AWS : il fonctionne AVANT tout déploiement.
+  api-build:
+    name: API · Build + /health
+    needs: [api-check, api-db, locales]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-modules
+        with:
+          dir: api
+
+      - name: tsc -p tsconfig.build.json (npm run build)
+        run: npm run build
+
+      - name: "Smoke test : démarrer l'API et appeler GET /health"
+        env:
+          NODE_ENV: production
+          PORT: 3002
+        run: |
+          # Le serveur écrit dans server.log et est TOUJOURS arrêté à la fin (succès ou échec).
+          node dist/index.js > server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID; echo "--- journal du serveur"; cat server.log' EXIT
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
+            http://localhost:3002/health | tee health.json
+          echo
+          node -e '
+            const health = JSON.parse(require("fs").readFileSync("health.json", "utf8"))
+            const { version } = JSON.parse(require("fs").readFileSync("package.json", "utf8"))
+            const ok = health.status === "ok" && health.env === "production" && health.version === version
+            if (!ok) { console.error("Réponse /health inattendue :", health); process.exit(1) }
+            console.log(`OK : status=${health.status}, version=${health.version}, env=${health.env}`)
+          '
+
+      - name: Paquet AWS Lambda (npm run build:lambda) + appel du handler
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          npm run build:lambda
+          node scripts/invoke-lambda.mjs "$GIT_COMMIT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: api-build
+          path: api/dist/
+          retention-days: 1
+
+  # ── Étape 4 : test de bout en bout ────────────────────────────────────────────────────────────
+  # Un vrai navigateur pilote le front compilé (job Build), qui parle à la VRAIE API compilée (job API · Build).
+  # Seule PokéAPI est simulée (faux serveur pour le rendu serveur de la fiche).
+  e2e:
+    name: E2E (Playwright)
+    needs: [build, api-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/node-modules
+      - name: Récupérer node_modules (api) depuis le cache
+        uses: actions/cache/restore@v6
+        with:
+          path: api/node_modules
+          key: node-modules-${{ runner.os }}-node24-api-${{ hashFiles('api/package-lock.json') }}
+          fail-on-cache-miss: true
+
+      - name: Récupérer le site compilé (job Build)
+        uses: actions/download-artifact@v8
+        with:
+          name: front-build
+          path: .output
+
+      - name: Récupérer l'API compilée (job API · Build)
+        uses: actions/download-artifact@v8
+        with:
+          name: api-build
+          path: api/dist
 
       - name: Installer Chromium pour Playwright
         run: npx playwright install --with-deps chromium
-
-      - name: Build de l'application
-        run: npm run build
-
-      - name: Build de l'API
-        run: npm run build
-        working-directory: api
 
       # Les serveurs sont démarrés EXPLICITEMENT (visibles dans Actions), en arrière-plan,
       # avec leurs journaux dans des fichiers. Playwright les réutilise (reuseExistingServer en CI).
@@ -145,7 +307,7 @@ jobs:
 
       - name: Rapport Playwright (si échec)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
@@ -153,132 +315,179 @@ jobs:
             test-results/
           retention-days: 7
 
-  # ── API (Hono + TypeScript), dossier api/ : ses PROPRES outils (api/package.json) ──
-  # Même principe que le front : un check par outil, pour voir tout de suite lequel échoue.
-  api-check:
-    name: API · ${{ matrix.name }}
+  # ── Étape 5 : déploiement continu (CD), seulement sur main, quand TOUT ce qui précède est vert ──
+  #
+  # Sécurité AWS : AUCUNE clé d'accès stockée dans GitHub. GitHub prouve son identité à AWS par OIDC
+  # (jeton signé, valable quelques minutes) ; AWS l'échange contre des droits temporaires sur UN rôle,
+  # qui ne peut que mettre à jour le code de CETTE fonction Lambda (voir infra/aws-setup.sh).
+  # DATABASE_URL n'est jamais dans GitHub : elle est dans la configuration de la fonction Lambda.
+  deploy-api:
+    name: Deploy API (AWS Lambda)
+    needs: e2e
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: ESLint
-            script: lint
-            cmd: eslint . --max-warnings 0
-          - name: Prettier
-            script: format:check
-            cmd: prettier --check .
-          - name: TypeScript
-            script: typecheck
-            cmd: tsc --noEmit
-          - name: Vitest
-            script: test
-            cmd: vitest run
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: api/package-lock.json
-
-      - name: Installer les dépendances (npm ci)
-        run: npm ci
-
-      - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
-        run: npm run ${{ matrix.script }}
-
-  # Tests d'intégration du stockage sur un VRAI serveur PostgreSQL 17 (même version que Supabase),
-  # lancé à côté du job (« service container ») : base jetable, isolée, détruite à la fin du job.
-  # Le schéma vient de supabase/init.sql ; aucun mock SQL. (En local, ces tests utilisent PGlite.)
-  api-db:
-    name: API · Vitest sur PostgreSQL 17
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: api
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          # Base jetable, joignable seulement depuis ce job : connexion sans mot de passe (« trust »).
-          # Aucun mot de passe dans le dépôt → rien que GitGuardian puisse signaler.
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 20
+    # Environnement GitHub « production » : secrets et variables de déploiement, réservé à la branche main.
+    environment:
+      name: production
+      url: ${{ vars.API_URL }}/health
+    concurrency:
+      group: deploy-production-api
+      cancel-in-progress: false
+    permissions:
+      id-token: write # demander le jeton OIDC à GitHub (connexion à AWS sans clé)
+      contents: read
     env:
-      TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: api/package-lock.json
-
-      - name: Installer les dépendances (npm ci)
-        run: npm ci
-
-      - name: vitest run test/db (npm run test:db)
-        run: npm run test:db
-
-  # Build de l'API, puis démarrage du vrai serveur compilé et appel de GET /health (smoke test).
-  api-build:
-    name: API · Build + smoke test
-    runs-on: ubuntu-latest
+      DEPLOY_SHA: ${{ github.sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
+      API_URL: ${{ vars.API_URL }}
     defaults:
       run:
         working-directory: api
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: api/package-lock.json
-
-      - name: Installer les dépendances (npm ci)
-        run: npm ci
-
-      - name: tsc -p tsconfig.build.json (npm run build)
-        run: npm run build
-
-      - name: "Smoke test : démarrer l'API et appeler GET /health"
-        env:
-          NODE_ENV: production
-          PORT: 3002
+      - name: Vérifier la configuration (variables de l'environnement production)
+        working-directory: .
         run: |
-          # Le serveur écrit dans server.log et est TOUJOURS arrêté à la fin (succès ou échec).
-          node dist/index.js > server.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID; echo "--- journal du serveur"; cat server.log' EXIT
-          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 \
-            http://localhost:3002/health | tee health.json
-          echo
-          node -e '
-            const health = JSON.parse(require("fs").readFileSync("health.json", "utf8"))
-            const { version } = JSON.parse(require("fs").readFileSync("package.json", "utf8"))
-            const ok = health.status === "ok" && health.env === "production" && health.version === version
-            if (!ok) { console.error("Réponse /health inattendue :", health); process.exit(1) }
-            console.log(`OK : status=${health.status}, version=${health.version}, env=${health.env}`)
-          '
+          missing=0
+          for name in AWS_REGION FUNCTION_NAME API_URL; do
+            if [ -z "${!name}" ]; then echo "::error::Variable manquante : $name"; missing=1; fi
+          done
+          exit $missing
 
-      # Le paquet déployé sur AWS Lambda par le workflow CD : construit et appelé ici, sans AWS.
-      # Une CI verte garantit donc que le paquet fonctionne AVANT tout déploiement.
-      - name: Paquet AWS Lambda (npm run build:lambda) + appel du handler
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node-modules
+        with:
+          dir: api
+
+      - name: '[1/4] Construire le paquet Lambda (commit ${{ env.DEPLOY_SHA }})'
         env:
-          GIT_COMMIT: ${{ github.sha }}
+          GIT_COMMIT: ${{ env.DEPLOY_SHA }}
         run: |
           npm run build:lambda
           node scripts/invoke-lambda.mjs "$GIT_COMMIT"
+          cd dist-lambda && zip -q ../lambda.zip index.mjs && cd ..
+          ls -l lambda.zip
+
+      - name: '[2/4] Se connecter à AWS (OIDC, droits temporaires)'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: pokewishlist-cd-${{ github.run_id }}
+
+      - name: '[3/4] Envoyer le code sur la fonction Lambda'
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://lambda.zip \
+            --query '{Version: Version, LastModified: LastModified, CodeSize: CodeSize}' \
+            --output table
+          # Attendre que la nouvelle version soit active avant de la tester.
+          aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
+
+      - name: '[4/4] Vérifier en ligne (API Gateway) : /health = ce commit, /wishlist, CORS'
+        run: |
+          # 1. /health renvoie le commit déployé (on réessaie : la nouvelle version peut mettre quelques secondes).
+          for i in $(seq 1 10); do
+            body=$(curl --silent --show-error --max-time 15 "$API_URL/health" || true)
+            commit=$(node -e 'try { console.log(JSON.parse(process.argv[1]).commit) } catch { console.log("") }' "$body")
+            echo "[$i/10] GET /health → commit ${commit:-?}"
+            [ "$commit" = "$DEPLOY_SHA" ] && break
+            sleep 3
+          done
+          if [ "$commit" != "$DEPLOY_SHA" ]; then
+            echo "::error::L'API en ligne ne renvoie pas le commit déployé ($DEPLOY_SHA). Dernière réponse : $body"
+            exit 1
+          fi
+          echo "$body"
+
+          # 2. /wishlist répond 200 avec une liste JSON (Supabase joignable depuis Lambda).
+          code=$(curl --silent --max-time 15 -o wishlist.json -w '%{http_code}' "$API_URL/wishlist")
+          node -e '
+            const list = JSON.parse(require("fs").readFileSync("wishlist.json", "utf8"))
+            if (process.argv[1] !== "200" || !Array.isArray(list)) {
+              console.error(`::error::GET /wishlist → ${process.argv[1]} ${JSON.stringify(list)}`); process.exit(1)
+            }
+            console.log(`GET /wishlist → 200, ${list.length} Pokémon`)
+          ' "$code"
+
+          # 3. CORS : la requête préalable du navigateur (OPTIONS) est acceptée pour le front.
+          allow=$(curl --silent --max-time 15 -o /dev/null -D - -X OPTIONS "$API_URL/wishlist" \
+            -H "Origin: http://localhost:3001" -H "Access-Control-Request-Method: POST" \
+            | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin" {print $2}')
+          if [ "$allow" != "http://localhost:3001" ]; then
+            echo "::error::CORS : Access-Control-Allow-Origin = « $allow »"; exit 1
+          fi
+          echo "CORS (OPTIONS /wishlist) → autorisé pour http://localhost:3001"
+          echo "✔ L'API en ligne exécute le commit $DEPLOY_SHA et ses routes répondent"
+
+  # Front Nuxt (rendu serveur, SSR) sur Vercel, APRÈS l'API (le nouveau front peut avoir besoin de la nouvelle API).
+  # Le déploiement automatique de Vercel à chaque push est coupé (vercel.json) : c'est CE job qui déploie.
+  deploy-front:
+    name: Deploy (Vercel)
+    needs: deploy-api
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.FRONT_URL }}
+    concurrency:
+      group: deploy-production-front
+      cancel-in-progress: false
+    env:
+      DEPLOY_SHA: ${{ github.sha }}
+      FRONT_URL: ${{ vars.FRONT_URL }}
+      API_URL: ${{ vars.API_URL }}
+      # Lus par le CLI Vercel : quel compte, quel projet.
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_CLI: vercel@65.10.0
+    steps:
+      - name: Vérifier la configuration (variables et secret de l'environnement production)
+        run: |
+          missing=0
+          for name in FRONT_URL API_URL VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN; do
+            if [ -z "${!name}" ]; then echo "::error::Manquant : $name"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node-modules
+
+      - name: '[1/4] Récupérer la configuration du projet Vercel'
+        run: npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: '[2/4] Construire le site (nuxt build, preset Vercel, commit ${{ env.DEPLOY_SHA }})'
+        env:
+          GIT_COMMIT: ${{ env.DEPLOY_SHA }}
+          NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }}
+        run: npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+
+      - name: '[3/4] Mettre en ligne (production)'
+        run: |
+          url=$(npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          echo "Déploiement : $url"
+
+      - name: '[4/4] Vérifier en ligne : le HTML rendu par le serveur porte ce commit'
+        run: |
+          # curl ne lance aucun JavaScript : ce qu'il reçoit est bien le rendu SERVEUR (SSR).
+          for i in $(seq 1 10); do
+            html=$(curl --silent --max-time 20 "$FRONT_URL/" || true)
+            commit=$(printf '%s' "$html" | grep -o '<meta name="app-commit" content="[0-9a-f]*"' | sed 's/.*content="//; s/"$//')
+            echo "[$i/10] $FRONT_URL/ → commit ${commit:-?}"
+            [ "$commit" = "$DEPLOY_SHA" ] && break
+            sleep 5
+          done
+          if [ "$commit" != "$DEPLOY_SHA" ]; then
+            echo "::error::Le site en ligne ne porte pas le commit déployé ($DEPLOY_SHA)"; exit 1
+          fi
+          # Une fiche rendue par le serveur : données PokéAPI déjà dans le HTML.
+          code=$(curl --silent --max-time 20 -o fiche.html -w '%{http_code}' "$FRONT_URL/pokemon/495")
+          grep -q 'Snivy' fiche.html || { echo "::error::/pokemon/495 → $code, sans « Snivy » dans le HTML"; exit 1; }
+          echo "GET /pokemon/495 → $code, fiche rendue par le serveur"
+          echo "✔ Le site en ligne exécute le commit $DEPLOY_SHA"

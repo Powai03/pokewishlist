@@ -6,9 +6,13 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       // Adresse de l'API Hono. Modifiable sans rebuild : NUXT_PUBLIC_API_BASE=https://… node .output/server/index.mjs
-      apiBase: 'http://localhost:3002',
+      // Au build, NUXT_PUBLIC_API_BASE (fournie par le CD : l'API Gateway sur AWS) devient la valeur par défaut.
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3002',
       // Adresse de PokéAPI pour la fiche d'un Pokémon (NUXT_PUBLIC_POKEAPI_BASE) : remplacée par un faux serveur dans les tests E2E.
       pokeapiBase: 'https://pokeapi.co/api/v2',
+      // Commit git gravé au build (GIT_COMMIT, fourni par le CD) : affiché dans le HTML rendu par le serveur,
+      // il prouve QUELLE version du site est en ligne.
+      commit: process.env.GIT_COMMIT || 'local',
     },
   },
   compatibilityDate: '2025-07-15',
