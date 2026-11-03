@@ -112,13 +112,14 @@ describe('runner de migrations', () => {
 
 describe('likes (table pokemon_likes)', () => {
   it('like → total qui augmente, conservé après une nouvelle exécution des migrations', async () => {
-    await db.clean()
+    // Pas de db.clean() : en CI, la base est partagée avec les autres fichiers de test.
+    // On travaille donc en relatif, sur un Pokémon que les autres tests n'utilisent pas.
     const store = new PostgresWishlistStore(db.url, { ssl: false, max: 1 })
-    expect(await store.likes(495)).toBe(0)
-    expect(await store.like(495)).toBe(1)
-    expect(await store.like(495)).toBe(2)
+    const before = await store.likes(649)
+    expect(await store.like(649)).toBe(before + 1)
+    expect(await store.like(649)).toBe(before + 2)
     expect(await runMigrations(db.sql)).toMatchObject({ applied: [] }) // rien à refaire…
-    expect(await store.likes(495)).toBe(2) // … et le like est toujours là
+    expect(await store.likes(649)).toBe(before + 2) // … et les likes sont toujours là
     await store.close()
   })
 })

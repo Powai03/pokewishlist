@@ -15,7 +15,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:db": "vitest run test/db",
+    "test:db": "vitest run test/db --no-file-parallelism",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
