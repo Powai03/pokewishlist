@@ -85,3 +85,68 @@ describe('handler AWS Lambda', () => {
     )
   })
 })
+
+describe('événements API Gateway', () => {
+  it('HTTP API (format 2.0, stage $default) → mêmes routes', async () => {
+    const event = {
+      version: '2.0',
+      routeKey: '$default',
+      rawPath: '/health',
+      rawQueryString: '',
+      headers: { host: 'abc.execute-api.eu-west-1.amazonaws.com' },
+      requestContext: {
+        apiId: 'abc',
+        stage: '$default',
+        domainName: 'abc.execute-api.eu-west-1.amazonaws.com',
+        http: { method: 'GET', path: '/health', sourceIp: '203.0.113.7' },
+      },
+      isBase64Encoded: false,
+    }
+    const res = await call(event)
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toMatchObject({ status: 'ok' })
+  })
+
+  it('HTTP API : requête préalable CORS (OPTIONS) → 204 et en-têtes CORS', async () => {
+    const res = await call(
+      urlEvent('OPTIONS', '/wishlist', {
+        headers: {
+          origin: 'http://localhost:3001',
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type',
+        },
+      }),
+    )
+    expect(res.statusCode).toBe(204)
+    expect(res.headers['access-control-allow-origin']).toBe(
+      'http://localhost:3001',
+    )
+    expect(res.headers['access-control-allow-methods']).toContain('POST')
+  })
+
+  it('REST API (format 1.0) → mêmes routes, erreurs traduites', async () => {
+    const event = {
+      resource: '/{proxy+}',
+      path: '/wishlist/650',
+      httpMethod: 'DELETE',
+      headers: { 'Accept-Language': 'es' },
+      multiValueHeaders: { 'Accept-Language': ['es'] },
+      queryStringParameters: null,
+      multiValueQueryStringParameters: null,
+      requestContext: {
+        stage: 'prod',
+        resourcePath: '/{proxy+}',
+        httpMethod: 'DELETE',
+        path: '/prod/wishlist/650',
+      },
+      body: null,
+      isBase64Encoded: false,
+    }
+    const res = await call(event)
+    expect(res.statusCode).toBe(404)
+    expect(JSON.parse(res.body)).toEqual({
+      error: 'El Pokémon #650 no está en la wishlist',
+      code: 'notInList',
+    })
+  })
+})

@@ -154,7 +154,9 @@ curl -X DELETE http://localhost:3002/wishlist/495 -H "Accept-Language: fr"
 
 ## Déploiement continu (CD) de l'API sur AWS Lambda
 
-Après chaque merge dans `main`, si **toute la CI est verte**, le workflow `.github/workflows/cd.yml` construit l'API en un seul fichier (`npm --prefix api run build:lambda`), l'envoie sur la fonction Lambda, puis vérifie en ligne que `GET /health` renvoie bien le commit déployé (champ `commit`).
+Après chaque merge dans `main`, si **toute la CI est verte**, le workflow `.github/workflows/cd.yml` construit l'API en un seul fichier (`npm --prefix api run build:lambda`), l'envoie sur la fonction Lambda, puis vérifie en ligne, via l'API Gateway, que `GET /health` renvoie le commit déployé, que `GET /wishlist` répond et que le CORS est accepté.
+
+Adresse publique : **API Gateway (HTTP API)** `https://r3as2k0zxl.execute-api.eu-west-1.amazonaws.com` (`/health`, `/wishlist`), limitée à 10 requêtes/s (pics à 20). Supabase y est joint par son pooler en mode transaction (port 6543) ; CORS géré par Hono (`CORS_ORIGIN`).
 
 - Connexion à AWS par **OIDC** : aucune clé AWS dans GitHub, seulement l'identifiant d'un rôle (secret `AWS_ROLE_ARN`) qui ne peut que mettre à jour le code de cette fonction, et seulement depuis l'environnement GitHub `production`.
 - `DATABASE_URL` reste côté AWS (configuration de la fonction), jamais dans GitHub.
