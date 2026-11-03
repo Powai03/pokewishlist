@@ -85,6 +85,14 @@ API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬
 Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘     (main uniquement)
 ```
 
+Tests de bout en bout en local :
+
+```bash
+npm run build:e2e && npm --prefix api run build && npm run e2e
+```
+
+`build:e2e` construit le site avec l'adresse de l'API de test (port 3101) : les fiches pré-rendues la figent au build. Les parcours (`e2e/parcours.spec.ts`) vont du navigateur jusqu'à l'API : fiche, langues, persistance sur un 2e appareil, likes (2 visiteurs, fiche pré-rendue).
+
 Les jobs « Install » mettent `node_modules` en cache pour les suivants ; le Build transmet le site compilé à l'E2E (artefact). Les déploiements ne tournent que sur un push dans `main`, quand tout le reste est vert.
 
 ## API (Hono + TypeScript)
