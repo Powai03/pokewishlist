@@ -1,4 +1,11 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import { readFileSync } from 'node:fs'
+
+// Les 156 Pokémon d'Unys (scripts/fetch-gen5-pokemon.mjs → data/gen5-pokemon.json).
+const gen5: { id: number; name: string }[] = JSON.parse(
+  readFileSync(new URL('./data/gen5-pokemon.json', import.meta.url), 'utf8'),
+)
+
 export default defineNuxtConfig({
   modules: ['@nuxt/eslint', '@nuxtjs/i18n'],
   devtools: { enabled: true },
@@ -13,6 +20,16 @@ export default defineNuxtConfig({
       // Commit git gravé au build (GIT_COMMIT, fourni par le CD) : affiché dans le HTML rendu par le serveur,
       // il prouve QUELLE version du site est en ligne.
       commit: process.env.GIT_COMMIT || 'local',
+    },
+  },
+  // Pré-rendu : au build, Nitro génère le HTML de chaque fiche /pokemon/<nom> (156 pages statiques,
+  // servies sans calcul ni appel à PokéAPI). Les autres adresses (/pokemon/495…) restent rendues à la demande (SSR).
+  nitro: {
+    prerender: {
+      routes: gen5.map((p) => `/pokemon/${p.name}`),
+      crawlLinks: false, // seulement ces 156 pages (pas les liens « N°494 ◀ ▶ N°496 » en double)
+      concurrency: 8, // 8 pages à la fois (2 appels PokéAPI chacune)
+      failOnError: true, // une fiche en erreur fait échouer le build (et donc la CI)
     },
   },
   compatibilityDate: '2025-07-15',

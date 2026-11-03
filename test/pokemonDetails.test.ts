@@ -191,14 +191,39 @@ describe('fetchPokemonDetails (200)', () => {
 
   it('accepte un nom et une autre adresse de PokéAPI (base configurable)', async () => {
     const fake = mockFetch({
-      '/pokemon/snivy': SNIVY,
+      '/pokemon/495': SNIVY,
       '/pokemon-species/snivy': SNIVY_SPECIES,
     })
     await fetchPokemonDetails('snivy', 'http://mock.test/api/')
     expect(fake).toHaveBeenCalledWith(
-      'http://mock.test/api/pokemon/snivy',
+      'http://mock.test/api/pokemon/495',
       undefined,
     )
+  })
+})
+
+describe('fetchPokemonDetails : un nom passe par l’espèce', () => {
+  it('nom → /pokemon-species/<nom> puis /pokemon/<numéro> (2 appels)', async () => {
+    const fake = mockFetch({
+      '/pokemon-species/snivy': SNIVY_SPECIES,
+      '/pokemon/495': SNIVY,
+    })
+    const p = await fetchPokemonDetails('snivy')
+    expect(p.id).toBe(495)
+    expect(fake.mock.calls.map((c) => String(c[0]))).toEqual([
+      'https://pokeapi.co/api/v2/pokemon-species/snivy',
+      'https://pokeapi.co/api/v2/pokemon/495',
+    ])
+  })
+
+  it('espèce dont /pokemon/<nom> n’existe pas (darmanitan) → fiche trouvée par le numéro', async () => {
+    mockFetch({
+      // /pokemon/darmanitan absent (404), comme sur le vrai PokéAPI : seule « darmanitan-standard » existe.
+      '/pokemon-species/darmanitan': { ...SNIVY_SPECIES, id: 555 },
+      '/pokemon/555': { ...SNIVY, id: 555, name: 'darmanitan-standard' },
+    })
+    const p = await fetchPokemonDetails('darmanitan')
+    expect(p).toMatchObject({ id: 555, name: 'darmanitan-standard' })
   })
 })
 
@@ -211,13 +236,14 @@ describe('fetchPokemonDetails (cas 404)', () => {
   })
 
   it('Pokémon qui existe mais pas en 5e génération (pikachu) → PokemonNotFoundError aussi', async () => {
-    mockFetch({
-      '/pokemon/pikachu': { ...SNIVY, id: 25, name: 'pikachu' },
+    const fake = mockFetch({
+      '/pokemon/25': { ...SNIVY, id: 25, name: 'pikachu' },
       '/pokemon-species/pikachu': { ...SNIVY_SPECIES, id: 25 },
     })
     await expect(fetchPokemonDetails('pikachu')).rejects.toBeInstanceOf(
       PokemonNotFoundError,
     )
+    expect(fake).toHaveBeenCalledTimes(1) // pas d'appel inutile à /pokemon/25
   })
 
   it('PokéAPI en panne (500) → PokeApiError, pas un 404', async () => {

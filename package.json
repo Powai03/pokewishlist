@@ -12,6 +12,7 @@
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "check:locales": "node scripts/check-locales.mjs",
+    "fetch:pokemon": "node scripts/fetch-gen5-pokemon.mjs",
     "e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

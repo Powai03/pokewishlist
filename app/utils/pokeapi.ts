@@ -230,13 +230,27 @@ export async function fetchPokemonDetails(
   base: string = API,
 ): Promise<PokemonDetails> {
   const root = base.replace(/\/$/, '')
-  const url = `${root}/pokemon/${encodeURIComponent(param)}`
-  const [pokemon, species] = await Promise.all([
-    getJson<PokemonResponse>(url),
-    getJson<SpeciesResponse>(
-      `${root}/pokemon-species/${encodeURIComponent(param)}`,
-    ),
-  ])
+  const speciesUrl = `${root}/pokemon-species/${encodeURIComponent(param)}`
+  // Un numéro : les deux appels en parallèle. Un nom : d'abord l'ESPÈCE, puis le Pokémon par son numéro.
+  // Pour certaines espèces (darmanitan, basculin, tornadus, keldeo, meloetta…), /pokemon/<nom> répond 404 :
+  // seules leurs formes existent (« darmanitan-standard »). Le numéro, lui, désigne toujours la forme par défaut.
+  const [pokemon, species] =
+    typeof param === 'number'
+      ? await Promise.all([
+          getJson<PokemonResponse>(`${root}/pokemon/${param}`),
+          getJson<SpeciesResponse>(speciesUrl),
+        ])
+      : await getJson<SpeciesResponse>(speciesUrl).then(
+          async (sp): Promise<[PokemonResponse, SpeciesResponse]> => {
+            // Espèce d'une autre génération (« pikachu ») : 404 sans 2e appel.
+            if (!isGen5(sp.id)) throw new PokemonNotFoundError(speciesUrl)
+            return [
+              await getJson<PokemonResponse>(`${root}/pokemon/${sp.id}`),
+              sp,
+            ]
+          },
+        )
+  const url = `${root}/pokemon/${pokemon.id}`
   // Un nom anglais peut désigner un Pokémon d'une autre génération (« pikachu ») : pas dans notre Pokédex.
   if (!isGen5(pokemon.id)) throw new PokemonNotFoundError(url)
 

@@ -147,6 +147,10 @@ Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des vir
 
 `/pokemon/495` ou `/pokemon/snivy` : fiche rendue par le serveur à partir de PokéAPI (nom, catégorie, types, taille, poids, texte du Pokédex, statistiques). Un Pokémon inconnu ou hors 5e génération renvoie une page **404**. Adresse de PokéAPI : `NUXT_PUBLIC_POKEAPI_BASE` (défaut `https://pokeapi.co/api/v2` ; un faux serveur, `e2e/pokeapi-mock.mjs`, la remplace pendant les tests E2E).
 
+### Pré-rendu des 156 fiches (5e génération)
+
+`npm run fetch:pokemon` (`scripts/fetch-gen5-pokemon.mjs`) récupère dans PokéAPI les 156 Pokémon d'Unys et écrit `data/gen5-pokemon.json` (versionné). Au build, `nuxt.config.ts` en fait les routes de pré-rendu de Nitro : `/pokemon/victini` … `/pokemon/genesect` sont générées en HTML statique (`.output/public/pokemon/<nom>/index.html`). Les autres adresses (`/pokemon/495`…) restent rendues à la demande.
+
 ## Langues (i18n)
 
 Interface en **anglais par défaut**, traduite en français, espagnol et japonais (sélecteur en haut de page ; choix mémorisé dans le cookie `lang`).
@@ -182,6 +186,7 @@ Site en ligne : **https://pokewishlist-nu.vercel.app** (rendu serveur, régions 
 
 Après chaque merge dans `main` et une CI verte, le pipeline déploie d'abord l'API (AWS), puis le front : `vercel build --prod` dans GitHub Actions (preset Nitro `vercel`, adresse de l'API gravée au build), `vercel deploy --prebuilt --prod`, puis vérification que le HTML rendu par le serveur porte le commit déployé (`<meta name="app-commit">`, aussi affiché en bas de page).
 
+- `.vercelignore` exclut `api/`, `infra/`, tests… : sinon Vercel prendrait chaque fichier de `api/` pour une fonction serverless (limite de 12 sur l'offre gratuite).
 - Le déploiement automatique de Vercel est coupé (`vercel.json` : `git.deploymentEnabled: false`) : seul GitHub Actions déploie, après la CI.
 - Environnement GitHub `production` : secret `VERCEL_TOKEN` ; variables `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `FRONT_URL`.
 - L'adresse du site est dans le CORS de l'API (`CORS_ORIGIN`, `infra/aws-setup.sh`).
