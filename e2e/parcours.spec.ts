@@ -173,6 +173,9 @@ test('langues : le choix suit la navigation et le rechargement, et part à l’A
 
   // Et l'API répond dans cette langue : erreur provoquée depuis l'écran d'accueil.
   await page.goto('/')
+  // Attendre que la liste soit chargée AVANT la suppression : sinon (CI plus lente) la page lirait
+  // une liste déjà vide, sans bouton « Capturer ».
+  await expect(page.getByTestId('card-495')).toBeVisible()
   await request.delete(`${API_URL}/wishlist/495`) // retiré par « un autre client »
   await page.locator('.cmd-catch').click()
   await expect(page.getByTestId('api-error')).toHaveText(
