@@ -1,7 +1,7 @@
 // Fiche d'un Pokémon (/pokemon/:id) : rendue par le serveur Nuxt à partir de PokéAPI (ici le faux PokéAPI, port 3102).
 // Vérifie : une adresse ouverte directement affiche le Pokémon et ses infos ; un Pokémon inconnu donne un vrai 404.
 import { expect, test, type APIRequestContext } from '@playwright/test'
-import { API_URL } from '../playwright.config'
+import { API_URL, FRONT_URL } from '../playwright.config'
 
 async function resetApi(request: APIRequestContext): Promise<void> {
   const items = (await (await request.get(`${API_URL}/wishlist`)).json()) as {
@@ -10,7 +10,9 @@ async function resetApi(request: APIRequestContext): Promise<void> {
   for (const { id } of items) await request.delete(`${API_URL}/wishlist/${id}`)
 }
 
-test.beforeEach(async ({ request }) => {
+// Fiche vérifiée EN FRANÇAIS (cookie « lang », comme après un choix dans le sélecteur de langue).
+test.beforeEach(async ({ context, request }) => {
+  await context.addCookies([{ name: 'lang', value: 'fr', url: FRONT_URL }])
   await resetApi(request)
 })
 
@@ -45,7 +47,9 @@ test.describe('adresse directe', () => {
   test('le HTML arrive déjà rempli du serveur (SSR), sans JavaScript', async ({
     request,
   }) => {
-    const res = await request.get('/pokemon/495')
+    const res = await request.get('/pokemon/495', {
+      headers: { cookie: 'lang=fr' },
+    })
     expect(res.status()).toBe(200)
     const html = await res.text()
     expect(html).toContain('Vipélierre')

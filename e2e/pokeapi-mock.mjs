@@ -29,12 +29,26 @@ const SNIVY = {
   },
   species: {
     id: 495,
-    names: [{ name: 'Vipélierre', language: { name: 'fr' } }],
-    genera: [{ genus: 'Pokémon Serpenterbe', language: { name: 'fr' } }],
+    // Plusieurs langues, comme le vrai PokéAPI : la fiche affiche celle choisie dans le sélecteur.
+    names: [
+      { name: 'Snivy', language: { name: 'en' } },
+      { name: 'Vipélierre', language: { name: 'fr' } },
+      { name: 'ツタージャ', language: { name: 'ja-Hrkt' } },
+    ],
+    genera: [
+      { genus: 'Grass Snake Pokémon', language: { name: 'en' } },
+      { genus: 'Pokémon Serpenterbe', language: { name: 'fr' } },
+      { genus: 'くさへびポケモン', language: { name: 'ja' } },
+    ],
     flavor_text_entries: [
       {
         flavor_text: 'Un Pokémon intelligent\net très calme.',
         language: { name: 'fr' },
+        version: { name: 'black' },
+      },
+      {
+        flavor_text: 'It is very intelligent\nand calm.',
+        language: { name: 'en' },
         version: { name: 'black' },
       },
     ],

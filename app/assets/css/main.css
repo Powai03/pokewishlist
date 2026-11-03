@@ -76,6 +76,13 @@ button:disabled {
   border-color: #ececea;
   border-radius: 0 14px 14px 0;
 }
+.logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  column-gap: 10px;
+}
 .logo-sub {
   display: inline-block;
   margin: 10px 0 0;

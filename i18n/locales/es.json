@@ -1,0 +1,109 @@
+{
+  "app": {
+    "subtitle": "Región de Teselia · 5.ª generación",
+    "homeLink": "PokéWishlist, inicio",
+    "footer": "Datos: {pokeapi} · Proyecto estudiantil no oficial, inspirado en Pokémon Negro y Blanco",
+    "language": "Idioma",
+    "dexNo": "N.º {n}"
+  },
+  "home": {
+    "title": "PokéWishlist · Teselia",
+    "actionsFor": "Acciones para {name}",
+    "catch": "Capturar",
+    "release": "Liberar",
+    "remove": "Quitar",
+    "removeLabel": "Quitar {name}",
+    "sheet": "Ficha",
+    "sheetLabel": "Ficha de {name}"
+  },
+  "scene": {
+    "label": "Pokémon seleccionado",
+    "empty": "La hierba alta está tranquila… ¡Busca un Pokémon de Teselia!",
+    "wild": "¡Un {name} salvaje apareció!",
+    "caught": "¡Ya está! ¡{name} ha sido capturado!",
+    "hunt": "Caza",
+    "progress": "Progreso de capturas",
+    "hp": "PS",
+    "captured": "Capturado"
+  },
+  "search": {
+    "title": "Pokédex · Teselia",
+    "label": "Nombre o número del Pokémon (494 a 649)",
+    "placeholder": "Nombre o n.º (p. ej. Snivy, 495)",
+    "apiDown": "PokéAPI no responde. Recarga la página en un momento.",
+    "noResult": "Ningún Pokémon de Teselia coincide (n.º 494 a 649).",
+    "full": "Caja llena ({max}/{max}): quita un Pokémon para añadir otro.",
+    "notFound": "{name} no se encuentra en PokéAPI.",
+    "fetchFailed": "No se pudo obtener {name}. Inténtalo de nuevo.",
+    "results": "Resultados de búsqueda",
+    "inBox": "En la caja",
+    "boxFull": "Caja llena",
+    "add": "Añadir"
+  },
+  "box": {
+    "title": "Caja · Por capturar",
+    "list": "Pokémon por capturar",
+    "captured": "{name} (capturado)",
+    "empty": "Tu caja está vacía. ¡Añade un Pokémon desde la Pokédex!"
+  },
+  "sheet": {
+    "dex": "Pokédex de Teselia",
+    "sprite": "Sprite de {name}",
+    "types": "Tipos",
+    "height": "Altura",
+    "weight": "Peso",
+    "noDescription": "Sin descripción en español.",
+    "stats": "Estadísticas base",
+    "total": "total {total}",
+    "loading": "Cargando…",
+    "inList": "En tu wishlist",
+    "full": "Wishlist llena",
+    "add": "Añadir",
+    "back": "Volver",
+    "neighbours": "Pokémon vecinos"
+  },
+  "error": {
+    "notFoundTitle": "Pokémon no encontrado",
+    "pokeapiDownTitle": "PokéAPI no responde",
+    "genericTitle": "Error",
+    "grass": "La hierba alta está vacía…",
+    "notGen5": "El n.º {id} no es un Pokémon de Teselia (n.º {first} a {last}).",
+    "invalidName": "«{raw}» no es un nombre de Pokémon válido.",
+    "unknownPokemon": "Ningún Pokémon de Teselia se llama «{raw}».",
+    "pokeapiDown": "No se puede cargar la ficha por ahora. Inténtalo de nuevo.",
+    "home": "Volver al PC"
+  },
+  "api": {
+    "unreachable": "La API no responde. ¿Está en marcha?",
+    "unexpected": "Respuesta inesperada de la API",
+    "status": "Error {status} de la API"
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Fuego",
+    "water": "Agua",
+    "grass": "Planta",
+    "electric": "Eléctrico",
+    "ice": "Hielo",
+    "fighting": "Lucha",
+    "poison": "Veneno",
+    "ground": "Tierra",
+    "flying": "Volador",
+    "psychic": "Psíquico",
+    "bug": "Bicho",
+    "rock": "Roca",
+    "ghost": "Fantasma",
+    "dragon": "Dragón",
+    "dark": "Siniestro",
+    "steel": "Acero",
+    "fairy": "Hada"
+  },
+  "stats": {
+    "hp": "PS",
+    "attack": "Ataque",
+    "defense": "Defensa",
+    "special-attack": "At. Esp.",
+    "special-defense": "Def. Esp.",
+    "speed": "Velocidad"
+  }
+}

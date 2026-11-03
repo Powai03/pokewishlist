@@ -2,7 +2,8 @@
 import type { Pokemon, WishlistItem } from '~/types/pokemon'
 
 // Page d'accueil : la console DS (combat en haut, recherche + boîte du PC en bas).
-useHead({ title: 'PokéWishlist · Unys' })
+const { t, locale } = useI18n()
+useHead({ title: () => t('home.title') })
 
 const { list, ready, error, stats, full, add, remove, toggle } = useWishlist()
 const owned = computed<number[]>(() => list.value.map((p) => p.id))
@@ -12,6 +13,11 @@ const selectedId = ref<number | null>(null)
 const selected = computed<WishlistItem | null>(
   () =>
     list.value.find((p) => p.id === selectedId.value) ?? list.value[0] ?? null,
+)
+
+/** Nom du Pokémon sélectionné dans la langue affichée. */
+const selectedName = computed<string>(() =>
+  selected.value ? pokemonName(selected.value, locale.value) : '',
 )
 
 async function onAdd(pokemon: Pokemon): Promise<void> {
@@ -43,29 +49,29 @@ async function onAdd(pokemon: Pokemon): Promise<void> {
           v-if="ready && selected"
           class="commands"
           role="group"
-          :aria-label="`Actions pour ${selected.frName}`"
+          :aria-label="t('home.actionsFor', { name: selectedName })"
         >
           <button
             type="button"
             class="cmd cmd-catch"
             @click="toggle(selected.id)"
           >
-            {{ selected.captured ? 'Relâcher' : 'Capturer' }}
+            {{ selected.captured ? t('home.release') : t('home.catch') }}
           </button>
           <button
             type="button"
             class="cmd cmd-run"
-            :aria-label="`Retirer ${selected.frName}`"
+            :aria-label="t('home.removeLabel', { name: selectedName })"
             @click="remove(selected.id)"
           >
-            Retirer
+            {{ t('home.remove') }}
           </button>
           <NuxtLink
             :to="`/pokemon/${selected.id}`"
             class="cmd cmd-info"
-            :aria-label="`Fiche de ${selected.frName}`"
+            :aria-label="t('home.sheetLabel', { name: selectedName })"
           >
-            Fiche
+            {{ t('home.sheet') }}
           </NuxtLink>
         </div>
 

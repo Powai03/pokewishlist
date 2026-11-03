@@ -1,0 +1,109 @@
+{
+  "app": {
+    "subtitle": "Région d'Unys · 5e génération",
+    "homeLink": "PokéWishlist, accueil",
+    "footer": "Données : {pokeapi} · Projet étudiant non officiel, inspiré de Pokémon Noir et Blanc",
+    "language": "Langue",
+    "dexNo": "N°{n}"
+  },
+  "home": {
+    "title": "PokéWishlist · Unys",
+    "actionsFor": "Actions pour {name}",
+    "catch": "Capturer",
+    "release": "Relâcher",
+    "remove": "Retirer",
+    "removeLabel": "Retirer {name}",
+    "sheet": "Fiche",
+    "sheetLabel": "Fiche de {name}"
+  },
+  "scene": {
+    "label": "Pokémon sélectionné",
+    "empty": "Les hautes herbes sont calmes… Cherche un Pokémon d'Unys !",
+    "wild": "Un {name} sauvage apparaît !",
+    "caught": "Et hop ! {name} est capturé !",
+    "hunt": "Chasse",
+    "progress": "Progression des captures",
+    "hp": "PV",
+    "captured": "Capturé"
+  },
+  "search": {
+    "title": "Pokédex · Unys",
+    "label": "Nom ou numéro du Pokémon (494 à 649)",
+    "placeholder": "Nom ou n° (ex. Vipélierre, 495)",
+    "apiDown": "PokéAPI ne répond pas. Recharge la page dans un instant.",
+    "noResult": "Aucun Pokémon d'Unys ne correspond (n° 494 à 649).",
+    "full": "Boîte pleine ({max}/{max}) : retire un Pokémon pour en ajouter un autre.",
+    "notFound": "{name} est introuvable sur PokéAPI.",
+    "fetchFailed": "Impossible de récupérer {name}. Réessaie.",
+    "results": "Résultats de recherche",
+    "inBox": "Dans la boîte",
+    "boxFull": "Boîte pleine",
+    "add": "Ajouter"
+  },
+  "box": {
+    "title": "Boîte · À capturer",
+    "list": "Pokémon à capturer",
+    "captured": "{name} (capturé)",
+    "empty": "Ta boîte est vide. Ajoute un Pokémon depuis le Pokédex !"
+  },
+  "sheet": {
+    "dex": "Pokédex d'Unys",
+    "sprite": "Sprite de {name}",
+    "types": "Types",
+    "height": "Taille",
+    "weight": "Poids",
+    "noDescription": "Aucune description en français.",
+    "stats": "Statistiques de base",
+    "total": "total {total}",
+    "loading": "Chargement…",
+    "inList": "Dans ta wishlist",
+    "full": "Wishlist pleine",
+    "add": "Ajouter",
+    "back": "Retour",
+    "neighbours": "Pokémon voisins"
+  },
+  "error": {
+    "notFoundTitle": "Pokémon introuvable",
+    "pokeapiDownTitle": "PokéAPI ne répond pas",
+    "genericTitle": "Erreur",
+    "grass": "Les hautes herbes sont vides…",
+    "notGen5": "Le n°{id} n'est pas un Pokémon d'Unys (n°{first} à {last}).",
+    "invalidName": "« {raw} » n'est pas un nom de Pokémon valide.",
+    "unknownPokemon": "Aucun Pokémon d'Unys ne répond au nom de « {raw} ».",
+    "pokeapiDown": "Impossible de charger la fiche pour le moment. Réessaie.",
+    "home": "Retour au PC"
+  },
+  "api": {
+    "unreachable": "L'API ne répond pas. Est-elle démarrée ?",
+    "unexpected": "Réponse inattendue de l'API",
+    "status": "Erreur {status} de l'API"
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Feu",
+    "water": "Eau",
+    "grass": "Plante",
+    "electric": "Électrik",
+    "ice": "Glace",
+    "fighting": "Combat",
+    "poison": "Poison",
+    "ground": "Sol",
+    "flying": "Vol",
+    "psychic": "Psy",
+    "bug": "Insecte",
+    "rock": "Roche",
+    "ghost": "Spectre",
+    "dragon": "Dragon",
+    "dark": "Ténèbres",
+    "steel": "Acier",
+    "fairy": "Fée"
+  },
+  "stats": {
+    "hp": "PV",
+    "attack": "Attaque",
+    "defense": "Défense",
+    "special-attack": "Atq. Spé.",
+    "special-defense": "Déf. Spé.",
+    "speed": "Vitesse"
+  }
+}

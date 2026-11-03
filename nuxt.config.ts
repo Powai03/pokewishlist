@@ -1,6 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint'],
+  modules: ['@nuxt/eslint', '@nuxtjs/i18n'],
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
@@ -22,6 +22,22 @@ export default defineNuxtConfig({
         '../vitest.config.ts',
       ],
     },
+  },
+  // Traductions : un fichier JSON par langue dans i18n/locales/ (en, fr, es, jp).
+  // · anglais par défaut, quelle que soit la langue du navigateur ;
+  // · pas de préfixe dans l'adresse (/pokemon/495 dans toutes les langues) ;
+  // · le choix du visiteur est mémorisé dans un cookie par app/plugins/locale-cookie.ts.
+  i18n: {
+    defaultLocale: 'en',
+    strategy: 'no_prefix',
+    detectBrowserLanguage: false,
+    locales: [
+      { code: 'en', language: 'en-US', name: 'English', file: 'en.json' },
+      { code: 'fr', language: 'fr-FR', name: 'Français', file: 'fr.json' },
+      { code: 'es', language: 'es-ES', name: 'Español', file: 'es.json' },
+      // Code de LANGUE « ja » (ISO 639-1) ; « jp » est un code de PAYS, gardé pour le nom du fichier.
+      { code: 'ja', language: 'ja-JP', name: '日本語', file: 'jp.json' },
+    ],
   },
   eslint: {
     // La mise en forme est confiée à Prettier : on coupe les règles de style d'ESLint pour éviter qu'ils se contredisent.

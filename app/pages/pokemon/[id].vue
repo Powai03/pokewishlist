@@ -3,6 +3,7 @@
 //
 // Les données sont chargées PAR LE SERVEUR (rendu SSR) : une adresse ouverte directement
 // arrive déjà remplie, et un Pokémon inconnu renvoie un vrai statut HTTP 404 (page d'erreur, error.vue).
+// Textes de l'interface : i18n/locales/*.json ; nom, catégorie et description : PokéAPI, dans les 4 langues.
 import type { PokemonDetails, PokemonStat } from '~/types/pokemon'
 import {
   PokemonNotFoundError,
@@ -12,17 +13,29 @@ import {
 import { formatDexNumber, formatHeight, formatWeight } from '~/utils/format'
 import { GEN5 } from '~/utils/wishlist'
 
+const { t, locale } = useI18n()
 const route = useRoute()
 const raw = String(route.params.id)
+
+// Les erreurs portent une CLÉ de traduction (data.i18n), pas une phrase : error.vue la traduit
+// dans la langue affichée, et la retraduit si on change de langue sur la page d'erreur.
 
 // 1. Adresse impossible (n°25, « <script> »…) : 404 tout de suite, sans appeler PokéAPI.
 const param = parsePokemonParam(raw)
 if (!param.ok) {
   throw createError({
     statusCode: 404,
-    statusMessage: 'Pokémon introuvable',
-    message: param.reason,
+    statusMessage: 'Pokemon not found',
     fatal: true,
+    data: {
+      i18n:
+        param.reason === 'notGen5'
+          ? {
+              key: 'error.notGen5',
+              params: { id: param.id, first: GEN5.first, last: GEN5.last },
+            }
+          : { key: 'error.invalidName', params: { raw: param.raw } },
+    },
   })
 }
 
@@ -37,14 +50,14 @@ const { data: pokemon, error } = await useAsyncData<PokemonDetails>(
       if (e instanceof PokemonNotFoundError) {
         throw createError({
           statusCode: 404,
-          statusMessage: 'Pokémon introuvable',
-          message: `Aucun Pokémon d'Unys ne répond au nom de « ${raw} ».`,
+          statusMessage: 'Pokemon not found',
+          data: { i18n: { key: 'error.unknownPokemon', params: { raw } } },
         })
       }
       throw createError({
         statusCode: 502,
-        statusMessage: 'PokéAPI ne répond pas',
-        message: 'Impossible de charger la fiche pour le moment. Réessaie.',
+        statusMessage: 'PokeAPI is not responding',
+        data: { i18n: { key: 'error.pokeapiDown' } },
       })
     }
   },
@@ -52,14 +65,24 @@ const { data: pokemon, error } = await useAsyncData<PokemonDetails>(
 if (error.value || !pokemon.value) {
   throw createError({
     statusCode: error.value?.statusCode ?? 404,
-    statusMessage: error.value?.statusMessage ?? 'Pokémon introuvable',
-    message: error.value?.message,
+    statusMessage: error.value?.statusMessage ?? 'Pokemon not found',
+    data: error.value?.data,
     fatal: true,
   })
 }
 const p = pokemon.value
 
-useHead({ title: `${p.frName} · N°${formatDexNumber(p.id)} · PokéWishlist` })
+// Textes PokéAPI dans la langue affichée (repli : nom de la wishlist, texte « aucune description »).
+const name = computed<string>(
+  () => inLocale(p.names, locale.value) ?? pokemonName(p, locale.value),
+)
+const genus = computed<string | null>(() => inLocale(p.genus, locale.value))
+const description = computed<string>(
+  () => inLocale(p.description, locale.value) ?? t('sheet.noDescription'),
+)
+const dexNo = (id: number): string => t('app.dexNo', { n: formatDexNumber(id) })
+
+useHead({ title: () => `${name.value} · ${dexNo(p.id)} · PokéWishlist` })
 
 // Pokémon précédent / suivant dans le Pokédex d'Unys (null aux deux bouts).
 const prevId = p.id > GEN5.first ? p.id - 1 : null
@@ -88,10 +111,10 @@ async function onAdd(): Promise<void> {
   adding.value = false
 }
 const addLabel = computed<string>(() => {
-  if (!ready.value) return 'Chargement…'
-  if (inList.value) return 'Dans ta wishlist'
-  if (full.value) return 'Wishlist pleine'
-  return 'Ajouter'
+  if (!ready.value) return t('sheet.loading')
+  if (inList.value) return t('sheet.inList')
+  if (full.value) return t('sheet.full')
+  return t('sheet.add')
 })
 </script>
 
@@ -101,41 +124,44 @@ const addLabel = computed<string>(() => {
     <div class="ds-shell ds-top">
       <div class="ds-screen dex">
         <div class="dex-bar">
-          <span>Pokédex d'Unys</span>
-          <span class="dex-no">N°{{ formatDexNumber(p.id) }}</span>
+          <span>{{ t('sheet.dex') }}</span>
+          <span class="dex-no">{{ dexNo(p.id) }}</span>
         </div>
         <div class="dex-body">
           <div class="dex-portrait">
             <img
               v-if="p.sprite"
               :src="p.sprite"
-              :alt="`Sprite de ${p.frName}`"
+              :alt="t('sheet.sprite', { name })"
               class="dex-sprite"
             />
           </div>
           <div class="dex-id">
-            <h2 class="dex-name">{{ p.frName }}</h2>
-            <p class="dex-en">{{ p.name }}</p>
-            <p v-if="p.genus" class="dex-genus">{{ p.genus }}</p>
-            <ul class="dex-types" aria-label="Types">
+            <h2 class="dex-name">{{ name }}</h2>
+            <!-- Nom anglais en petit, sauf s'il répète le nom affiché (anglais, espagnol) -->
+            <p v-if="p.name !== name.toLowerCase()" class="dex-en">
+              {{ p.name }}
+            </p>
+            <p v-if="genus" class="dex-genus">{{ genus }}</p>
+            <ul class="dex-types" :aria-label="t('sheet.types')">
               <li
-                v-for="t in p.types"
-                :key="t"
-                :style="{ '--type': typeInfo(t).color }"
+                v-for="type in p.types"
+                :key="type"
+                :style="{ '--type': typeColor(type) }"
               >
-                {{ typeInfo(t).label }}
+                {{ t(`types.${type}`) }}
               </li>
             </ul>
           </div>
         </div>
         <dl class="dex-size">
           <div>
-            <dt>Taille</dt>
-            <dd>{{ formatHeight(p.height) }}</dd>
+            <dt>{{ t('sheet.height') }}</dt>
+            <dd>{{ formatHeight(p.height, locale) }}</dd>
           </div>
           <div>
-            <dt>Poids</dt>
-            <dd>{{ formatWeight(p.weight) }}</dd>
+            <dt>{{ t('sheet.weight') }}</dt>
+            <dd>{{ formatWeight(p.weight, locale) }}</dd>
           </div>
         </dl>
       </div>
@@ -149,16 +175,17 @@ const addLabel = computed<string>(() => {
         <p v-if="apiError" class="api-error" role="alert">{{ apiError }}</p>
 
         <p class="dex-text" data-testid="pokemon-description">
-          {{ p.description ?? 'Aucune description en français.' }}
+          {{ description }}
         </p>
 
         <section class="stats" aria-labelledby="stats-title">
           <h3 id="stats-title" class="stats-title">
-            Statistiques de base <span>total {{ total }}</span>
+            {{ t('sheet.stats') }}
+            <span>{{ t('sheet.total', { total }) }}</span>
           </h3>
           <ul>
             <li v-for="s in p.stats" :key="s.key" class="stat">
-              <span class="stat-label">{{ s.label }}</span>
+              <span class="stat-label">{{ t(`stats.${s.key}`) }}</span>
               <span class="stat-value">{{ s.value }}</span>
               <span class="stat-track" aria-hidden="true">
                 <span
@@ -180,17 +207,17 @@ const addLabel = computed<string>(() => {
           >
             {{ addLabel }}
           </button>
-          <NuxtLink to="/" class="cmd cmd-run">Retour</NuxtLink>
+          <NuxtLink to="/" class="cmd cmd-run">{{ t('sheet.back') }}</NuxtLink>
         </div>
 
-        <nav class="dex-nav" aria-label="Pokémon voisins">
+        <nav class="dex-nav" :aria-label="t('sheet.neighbours')">
           <NuxtLink
             v-if="prevId"
             :to="`/pokemon/${prevId}`"
             class="dex-nav-link"
             rel="prev"
           >
-            ◀ N°{{ formatDexNumber(prevId) }}
+            ◀ {{ dexNo(prevId) }}
           </NuxtLink>
           <span v-else />
           <NuxtLink
@@ -199,7 +226,7 @@ const addLabel = computed<string>(() => {
             class="dex-nav-link"
             rel="next"
           >
-            N°{{ formatDexNumber(nextId) }} ▶
+            {{ dexNo(nextId) }} ▶
           </NuxtLink>
         </nav>
       </div>

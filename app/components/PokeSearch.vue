@@ -28,7 +28,9 @@ const noResult = computed<boolean>(
     index.value.length > 0 &&
     results.value.length === 0,
 )
-const label = (e: SpeciesEntry): string => e.frName ?? e.name
+const { t, locale } = useI18n()
+/** Nom affiché dans la langue choisie (nom français en français, anglais sinon). */
+const label = (e: SpeciesEntry): string => pokemonName(e, locale.value)
 
 async function add(entry: SpeciesEntry): Promise<void> {
   if (props.full || props.owned.includes(entry.id) || pendingId.value) return
@@ -40,8 +42,8 @@ async function add(entry: SpeciesEntry): Promise<void> {
   } catch (e: unknown) {
     error.value =
       e instanceof PokemonNotFoundError
-        ? `${label(entry)} est introuvable sur PokéAPI.`
-        : `Impossible de récupérer ${label(entry)}. Réessaie.`
+        ? t('search.notFound', { name: label(entry) })
+        : t('search.fetchFailed', { name: label(entry) })
   } finally {
     pendingId.value = null
   }
@@ -55,31 +57,28 @@ function addFirst(): void {
 
 <template>
   <section class="dex" aria-labelledby="dex-title">
-    <h2 id="dex-title" class="dex-title">Pokédex · Unys</h2>
+    <h2 id="dex-title" class="dex-title">{{ t('search.title') }}</h2>
 
     <form class="dex-form" role="search" @submit.prevent="addFirst">
-      <label for="search-input" class="sr-only"
-        >Nom ou numéro du Pokémon (494 à 649)</label
-      >
+      <label for="search-input" class="sr-only">{{ t('search.label') }}</label>
       <input
         id="search-input"
         v-model="query"
         type="search"
         autocomplete="off"
-        placeholder="Nom ou n° (ex. Vipélierre, 495)"
+        :placeholder="t('search.placeholder')"
         :disabled="indexError"
       />
     </form>
 
     <p v-if="indexError" class="dex-msg dex-error" role="alert">
-      PokéAPI ne répond pas. Recharge la page dans un instant.
+      {{ t('search.apiDown') }}
     </p>
     <p v-else-if="noResult" class="dex-msg">
-      Aucun Pokémon d'Unys ne correspond (n° 494 à 649).
+      {{ t('search.noResult') }}
     </p>
     <p v-if="full" class="dex-msg dex-full" role="status">
-      Boîte pleine ({{ WISHLIST_MAX }}/{{ WISHLIST_MAX }}) : retire un Pokémon
-      pour en ajouter un autre.
+      {{ t('search.full', { max: WISHLIST_MAX }) }}
     </p>
     <p v-if="error" class="dex-msg dex-error" role="alert">
       {{ error }}
@@ -88,7 +87,7 @@ function addFirst(): void {
     <ul
       v-if="results.length"
       class="dex-list"
-      aria-label="Résultats de recherche"
+      :aria-label="t('search.results')"
     >
       <li v-for="r in results" :key="r.id">
         <button
@@ -102,12 +101,12 @@ function addFirst(): void {
           <span class="dex-action">
             {{
               owned.includes(r.id)
-                ? 'Dans la boîte'
+                ? t('search.inBox')
                 : full
-                  ? 'Boîte pleine'
+                  ? t('search.boxFull')
                   : pendingId === r.id
                     ? '…'
-                    : 'Ajouter'
+                    : t('search.add')
             }}
           </span>
         </button>

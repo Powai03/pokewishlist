@@ -1,0 +1,109 @@
+{
+  "app": {
+    "subtitle": "Unova region · Generation V",
+    "homeLink": "PokéWishlist, home",
+    "footer": "Data: {pokeapi} · Unofficial student project, inspired by Pokémon Black and White",
+    "language": "Language",
+    "dexNo": "No.{n}"
+  },
+  "home": {
+    "title": "PokéWishlist · Unova",
+    "actionsFor": "Actions for {name}",
+    "catch": "Catch",
+    "release": "Release",
+    "remove": "Remove",
+    "removeLabel": "Remove {name}",
+    "sheet": "Info",
+    "sheetLabel": "Pokédex entry for {name}"
+  },
+  "scene": {
+    "label": "Selected Pokémon",
+    "empty": "The tall grass is quiet… Look for a Pokémon from Unova!",
+    "wild": "A wild {name} appeared!",
+    "caught": "Gotcha! {name} was caught!",
+    "hunt": "Hunt",
+    "progress": "Capture progress",
+    "hp": "HP",
+    "captured": "Caught"
+  },
+  "search": {
+    "title": "Pokédex · Unova",
+    "label": "Pokémon name or number (494 to 649)",
+    "placeholder": "Name or no. (e.g. Snivy, 495)",
+    "apiDown": "PokéAPI is not responding. Reload the page in a moment.",
+    "noResult": "No Unova Pokémon matches (no. 494 to 649).",
+    "full": "Box full ({max}/{max}): remove a Pokémon to add another one.",
+    "notFound": "{name} cannot be found on PokéAPI.",
+    "fetchFailed": "Could not fetch {name}. Try again.",
+    "results": "Search results",
+    "inBox": "In the box",
+    "boxFull": "Box full",
+    "add": "Add"
+  },
+  "box": {
+    "title": "Box · To catch",
+    "list": "Pokémon to catch",
+    "captured": "{name} (caught)",
+    "empty": "Your box is empty. Add a Pokémon from the Pokédex!"
+  },
+  "sheet": {
+    "dex": "Unova Pokédex",
+    "sprite": "Sprite of {name}",
+    "types": "Types",
+    "height": "Height",
+    "weight": "Weight",
+    "noDescription": "No description in English.",
+    "stats": "Base stats",
+    "total": "total {total}",
+    "loading": "Loading…",
+    "inList": "In your wishlist",
+    "full": "Wishlist full",
+    "add": "Add",
+    "back": "Back",
+    "neighbours": "Neighbouring Pokémon"
+  },
+  "error": {
+    "notFoundTitle": "Pokémon not found",
+    "pokeapiDownTitle": "PokéAPI is not responding",
+    "genericTitle": "Error",
+    "grass": "The tall grass is empty…",
+    "notGen5": "No. {id} is not a Unova Pokémon (no. {first} to {last}).",
+    "invalidName": "“{raw}” is not a valid Pokémon name.",
+    "unknownPokemon": "No Unova Pokémon goes by the name “{raw}”.",
+    "pokeapiDown": "The entry cannot be loaded right now. Try again.",
+    "home": "Back to the PC"
+  },
+  "api": {
+    "unreachable": "The API is not responding. Is it running?",
+    "unexpected": "Unexpected response from the API",
+    "status": "API error {status}"
+  },
+  "types": {
+    "normal": "Normal",
+    "fire": "Fire",
+    "water": "Water",
+    "grass": "Grass",
+    "electric": "Electric",
+    "ice": "Ice",
+    "fighting": "Fighting",
+    "poison": "Poison",
+    "ground": "Ground",
+    "flying": "Flying",
+    "psychic": "Psychic",
+    "bug": "Bug",
+    "rock": "Rock",
+    "ghost": "Ghost",
+    "dragon": "Dragon",
+    "dark": "Dark",
+    "steel": "Steel",
+    "fairy": "Fairy"
+  },
+  "stats": {
+    "hp": "HP",
+    "attack": "Attack",
+    "defense": "Defense",
+    "special-attack": "Sp. Atk",
+    "special-defense": "Sp. Def",
+    "speed": "Speed"
+  }
+}

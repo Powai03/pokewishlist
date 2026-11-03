@@ -1,18 +1,43 @@
 <script setup lang="ts">
 // Page d'erreur de Nuxt : affichée à la place de toute l'appli (404 Pokémon introuvable, 502 PokéAPI en panne…).
 // Le statut HTTP de la réponse est celui de l'erreur : une adresse inconnue renvoie bien un 404.
+//
+// Traduction : la fiche joint à l'erreur une CLÉ (error.data.i18n = { key, params }) plutôt qu'une phrase ;
+// le texte est donc toujours dans la langue affichée, même si on la change ici.
 import type { NuxtError } from '#app'
 
 const props = defineProps<{ error: NuxtError }>()
+const { t, te } = useI18n()
 
-const notFound = computed<boolean>(() => props.error.statusCode === 404)
-const title = computed<string>(() =>
-  notFound.value
-    ? 'Pokémon introuvable'
-    : (props.error.statusMessage ?? 'Erreur'),
+interface ErrorI18n {
+  key: string
+  params?: Record<string, string | number>
+}
+
+/** La clé de traduction jointe à l'erreur, si elle existe et est connue. */
+const i18nData = computed<ErrorI18n | null>(() => {
+  const data = props.error.data as { i18n?: ErrorI18n } | string | undefined
+  // Rendu côté serveur : `data` peut arriver sérialisé en texte JSON.
+  const parsed =
+    typeof data === 'string'
+      ? (JSON.parse(data) as { i18n?: ErrorI18n } | undefined)
+      : data
+  const i18n = parsed?.i18n
+  return i18n && te(i18n.key) ? i18n : null
+})
+
+const title = computed<string>(() => {
+  if (props.error.statusCode === 404) return t('error.notFoundTitle')
+  if (props.error.statusCode === 502) return t('error.pokeapiDownTitle')
+  return t('error.genericTitle')
+})
+const message = computed<string>(() =>
+  i18nData.value
+    ? t(i18nData.value.key, i18nData.value.params ?? {})
+    : props.error.message,
 )
 
-useHead({ title: `${title.value} · PokéWishlist` })
+useHead({ title: () => `${title.value} · PokéWishlist` })
 
 /** Efface l'erreur et revient à l'accueil. */
 const goHome = (): Promise<void> => clearError({ redirect: '/' })
@@ -31,13 +56,13 @@ const goHome = (): Promise<void> => clearError({ redirect: '/' })
       <div class="ds-shell ds-bottom">
         <div class="ds-screen touch">
           <p class="error-text" role="alert">
-            <template v-if="notFound">
-              Les hautes herbes sont vides… {{ error.message }}
+            <template v-if="error.statusCode === 404">
+              {{ t('error.grass') }}
             </template>
-            <template v-else>{{ error.message }}</template>
+            {{ message }}
           </p>
           <button type="button" class="cmd cmd-run" @click="goHome">
-            Retour au PC
+            {{ t('error.home') }}
           </button>
         </div>
       </div>

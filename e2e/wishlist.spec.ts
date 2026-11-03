@@ -13,7 +13,7 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test'
-import { API_URL } from '../playwright.config'
+import { API_URL, FRONT_URL } from '../playwright.config'
 
 // ── Fausses réponses PokéAPI : 7 Pokémon d'Unys (de quoi dépasser la limite de 6) ──
 const POKEMON: Record<number, { name: string; fr: string; types: string[] }> = {
@@ -101,7 +101,10 @@ async function addFromUi(page: Page, id: number): Promise<void> {
 const ids = async (request: APIRequestContext): Promise<number[]> =>
   (await apiWishlist(request)).map((p) => p.id)
 
-test.beforeEach(async ({ page, request }) => {
+// Ces tests vérifient l'interface EN FRANÇAIS : on choisit le français comme le ferait le sélecteur
+// de langue (cookie « lang »). L'anglais par défaut et le changement de langue : voir i18n.spec.ts.
+test.beforeEach(async ({ context, page, request }) => {
+  await context.addCookies([{ name: 'lang', value: 'fr', url: FRONT_URL }])
   await resetApi(request)
   await mockPokeApi(page)
   await page.goto('/')

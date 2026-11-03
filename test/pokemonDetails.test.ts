@@ -50,10 +50,13 @@ const SNIVY_SPECIES = {
   names: [
     { name: 'Snivy', language: { name: 'en' } },
     { name: 'Vipélierre', language: { name: 'fr' } },
+    { name: 'ツタージャ', language: { name: 'ja-Hrkt' } },
+    { name: 'Snivy', language: { name: 'es' } },
   ],
   genera: [
     { genus: 'Grass Snake Pokémon', language: { name: 'en' } },
     { genus: 'Pokémon Serpenterbe', language: { name: 'fr' } },
+    { genus: 'くさへびポケモン', language: { name: 'ja' } },
   ],
   flavor_text_entries: [
     {
@@ -85,10 +88,20 @@ describe('parsePokemonParam (adresse /pokemon/:id)', () => {
     expect(parsePokemonParam(raw)).toEqual({ ok: true, value })
   })
 
-  it('numéro hors 5e génération → refusé avec une explication', () => {
-    const result = parsePokemonParam('25')
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toContain('494 à 649')
+  it('numéro hors 5e génération → refusé avec un code (traduit par la page)', () => {
+    expect(parsePokemonParam('25')).toEqual({
+      ok: false,
+      reason: 'notGen5',
+      id: 25,
+    })
+  })
+
+  it('texte invalide → code « invalidName » avec le texte saisi', () => {
+    expect(parsePokemonParam('<b>')).toEqual({
+      ok: false,
+      reason: 'invalidName',
+      raw: '<b>',
+    })
   })
 
   it.each(['', '<script>', '../etc', 'a b', '-1', '1.5'])(
@@ -113,47 +126,67 @@ describe('fetchPokemonDetails (200)', () => {
       id: 495,
       name: 'snivy',
       frName: 'Vipélierre',
-      genus: 'Pokémon Serpenterbe',
+      genus: { en: 'Grass Snake Pokémon', fr: 'Pokémon Serpenterbe' },
       types: ['grass'],
       height: 6,
       weight: 81,
     })
   })
 
-  it('préfère le texte français de Noir et Blanc, sans retours à la ligne du jeu', async () => {
+  it('garde le nom dans chacune des 4 langues (japonais : repli sur « ja-Hrkt »)', async () => {
     mockFetch({
       '/pokemon/495': SNIVY,
       '/pokemon-species/495': SNIVY_SPECIES,
     })
     const p = await fetchPokemonDetails(495)
-    expect(p.description).toBe(
-      'Un Pokémon intelligent et très calme. Il aime le soleil.',
-    )
+    expect(p.names).toEqual({
+      en: 'Snivy',
+      fr: 'Vipélierre',
+      es: 'Snivy',
+      ja: 'ツタージャ',
+    })
   })
 
-  it('statistiques dans l’ordre du jeu, avec les libellés français', async () => {
+  it('préfère le texte de Noir et Blanc dans chaque langue, sans retours à la ligne du jeu', async () => {
     mockFetch({
       '/pokemon/495': SNIVY,
       '/pokemon-species/495': SNIVY_SPECIES,
     })
     const p = await fetchPokemonDetails(495)
-    expect(p.stats.map((s) => `${s.label} ${s.value}`)).toEqual([
-      'PV 45',
-      'Attaque 45',
-      'Défense 55',
-      'Atq. Spé. 45',
-      'Déf. Spé. 55',
-      'Vitesse 63',
+    expect(p.description).toEqual({
+      fr: 'Un Pokémon intelligent et très calme. Il aime le soleil.',
+      en: 'It is very intelligent.',
+    })
+  })
+
+  it('statistiques dans l’ordre du jeu (clés traduites par la page)', async () => {
+    mockFetch({
+      '/pokemon/495': SNIVY,
+      '/pokemon-species/495': SNIVY_SPECIES,
+    })
+    const p = await fetchPokemonDetails(495)
+    expect(p.stats.map((s) => `${s.key} ${s.value}`)).toEqual([
+      'hp 45',
+      'attack 45',
+      'defense 55',
+      'special-attack 45',
+      'special-defense 55',
+      'speed 63',
     ])
   })
 
-  it('sans texte ni catégorie en français → null (la page affiche un texte par défaut)', async () => {
+  it('sans aucun texte → objets vides (la page affiche un texte par défaut)', async () => {
     mockFetch({
       '/pokemon/495': SNIVY,
       '/pokemon-species/495': { id: 495, names: [] },
     })
     const p = await fetchPokemonDetails(495)
-    expect(p).toMatchObject({ frName: 'snivy', genus: null, description: null })
+    expect(p).toMatchObject({
+      frName: 'snivy',
+      names: {},
+      genus: {},
+      description: {},
+    })
   })
 
   it('accepte un nom et une autre adresse de PokéAPI (base configurable)', async () => {

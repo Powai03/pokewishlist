@@ -1,12 +1,14 @@
 // Accès à PokéAPI (https://pokeapi.co) : API publique, gratuite, sans clé.
 // On utilise le `fetch` STANDARD du navigateur (et de Node.js) plutôt que le `$fetch` de Nuxt :
 // il fonctionne partout, y compris dans les tests Vitest, où on peut le remplacer par un faux (mock).
-import type {
-  Pokemon,
-  PokemonDetails,
-  PokemonStat,
-  SpeciesEntry,
+import {
+  STAT_KEYS,
+  type Pokemon,
+  type PokemonDetails,
+  type PokemonStat,
+  type SpeciesEntry,
 } from '../types/pokemon'
+import { localize } from './locale'
 import { GEN5, idFromUrl, isGen5, isPokemonType } from './wishlist'
 
 const API = 'https://pokeapi.co/api/v2'
@@ -173,9 +175,14 @@ function toPokemon(pokemon: PokemonResponse, frName: string): Pokemon {
 
 // ── Fiche d'un Pokémon (page /pokemon/:id) ──────────────────────────────────
 
-/** Ce que l'adresse /pokemon/:id peut contenir : un numéro (« 495 ») ou un nom anglais (« snivy »). */
+/**
+ * Ce que l'adresse /pokemon/:id peut contenir : un numéro (« 495 ») ou un nom anglais (« snivy »).
+ * Un refus porte un CODE (et non une phrase) : la page le traduit dans la langue affichée.
+ */
 export type PokemonParam =
-  { ok: true; value: number | string } | { ok: false; reason: string }
+  | { ok: true; value: number | string }
+  | { ok: false; reason: 'notGen5'; id: number }
+  | { ok: false; reason: 'invalidName'; raw: string }
 
 /**
  * Vérifie le paramètre de l'adresse AVANT d'appeler PokéAPI :
@@ -187,45 +194,34 @@ export function parsePokemonParam(raw: string): PokemonParam {
     const id = Number(value)
     return isGen5(id)
       ? { ok: true, value: id }
-      : {
-          ok: false,
-          reason: `Le n°${id} n'est pas un Pokémon d'Unys (n°${GEN5.first} à ${GEN5.last}).`,
-        }
+      : { ok: false, reason: 'notGen5', id }
   }
   if (/^[a-z][a-z0-9-]{0,40}$/.test(value)) return { ok: true, value }
-  return { ok: false, reason: `« ${raw} » n'est pas un nom de Pokémon valide.` }
-}
-
-/** Statistiques de base, dans l'ordre et avec les libellés du jeu en français. */
-const STAT_LABELS: Record<string, string> = {
-  hp: 'PV',
-  attack: 'Attaque',
-  defense: 'Défense',
-  'special-attack': 'Atq. Spé.',
-  'special-defense': 'Déf. Spé.',
-  speed: 'Vitesse',
+  return { ok: false, reason: 'invalidName', raw }
 }
 
 /** Versions dont on préfère le texte de Pokédex : celles de la 5e génération d'abord. */
 const PREFERRED_VERSIONS = ['black', 'white', 'black-2', 'white-2']
 
-/** Texte de Pokédex en français (celui de Noir et Blanc si possible), nettoyé des retours à la ligne du jeu. */
-function frenchDescription(species: SpeciesResponse): string | null {
-  const fr = (species.flavor_text_entries ?? []).filter(
-    (e) => e.language.name === 'fr',
-  )
+type FlavorEntry = NonNullable<SpeciesResponse['flavor_text_entries']>[number]
+
+/** Parmi les textes d'une langue, celui de Noir et Blanc si possible. */
+function preferredFlavor(entries: FlavorEntry[]): FlavorEntry | undefined {
   const rank = (version: string): number => {
     const i = PREFERRED_VERSIONS.indexOf(version)
     return i === -1 ? PREFERRED_VERSIONS.length : i
   }
-  const best = [...fr].sort(
+  return [...entries].sort(
     (a, b) => rank(a.version.name) - rank(b.version.name),
   )[0]
-  return best ? best.flavor_text.replace(/[\s\u00ad]+/g, ' ').trim() : null
 }
 
+/** Texte du jeu nettoyé : retours à la ligne, sauts de page et tirets conditionnels → espaces simples. */
+const cleanFlavor = (e: FlavorEntry): string =>
+  e.flavor_text.replace(/[\s\u00ad]+/g, ' ').trim()
+
 /**
- * Fiche complète : deux appels en parallèle (/pokemon et /pokemon-species).
+ * Fiche complète : deux appels en parallèle (/pokemon et /pokemon-species), textes dans les 4 langues.
  * @param base adresse de PokéAPI (remplaçable, pour les tests de bout en bout).
  * @throws PokemonNotFoundError si le Pokémon n'existe pas OU n'est pas de 5e génération (même réponse : 404).
  */
@@ -244,18 +240,22 @@ export async function fetchPokemonDetails(
   // Un nom anglais peut désigner un Pokémon d'une autre génération (« pikachu ») : pas dans notre Pokédex.
   if (!isGen5(pokemon.id)) throw new PokemonNotFoundError(url)
 
-  const frName =
-    species.names.find((n) => n.language.name === 'fr')?.name ?? pokemon.name
-  const stats: PokemonStat[] = Object.keys(STAT_LABELS).flatMap((key) => {
+  // PokéAPI fournit noms, catégories et textes dans toutes les langues en UNE réponse :
+  // on les garde tous, la page choisit selon la langue affichée (sans nouvel appel au changement de langue).
+  const names = localize(species.names, (n) => n.name)
+  const stats: PokemonStat[] = STAT_KEYS.flatMap((key) => {
     const stat = pokemon.stats.find((s) => s.stat.name === key)
-    return stat
-      ? [{ key, label: STAT_LABELS[key] ?? key, value: stat.base_stat }]
-      : []
+    return stat ? [{ key, value: stat.base_stat }] : []
   })
   return {
-    ...toPokemon(pokemon, frName),
-    genus: species.genera?.find((g) => g.language.name === 'fr')?.genus ?? null,
-    description: frenchDescription(species),
+    ...toPokemon(pokemon, names.fr ?? pokemon.name),
+    names,
+    genus: localize(species.genera ?? [], (g) => g.genus),
+    description: localize(
+      species.flavor_text_entries ?? [],
+      cleanFlavor,
+      preferredFlavor,
+    ),
     height: pokemon.height,
     weight: pokemon.weight,
     stats,

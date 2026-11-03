@@ -1,8 +1,11 @@
 <script setup lang="ts">
-// Le cadre commun à toutes les pages : logo (lien vers l'accueil), contenu, pied de page.
+// Le cadre commun à toutes les pages : logo (lien vers l'accueil), sélecteur de langue, contenu, pied de page.
 // Utilisé par app.vue ET par error.vue (la page d'erreur remplace app.vue entièrement).
+const { t, localeProperties } = useI18n()
+
 useHead({
-  htmlAttrs: { lang: 'fr' },
+  // <html lang="…"> suit la langue choisie (lecteurs d'écran, traduction automatique, moteurs de recherche).
+  htmlAttrs: { lang: () => localeProperties.value.language ?? 'en' },
   link: [
     { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
     { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
@@ -19,21 +22,28 @@ useHead({
     <NuxtRouteAnnouncer />
 
     <header class="logo">
-      <NuxtLink to="/" class="logo-link" aria-label="PokéWishlist, accueil">
+      <NuxtLink to="/" class="logo-link" :aria-label="t('app.homeLink')">
         <h1 class="logo-title">
           <span class="logo-black">Poké</span
           ><span class="logo-white">Wishlist</span>
         </h1>
       </NuxtLink>
-      <p class="logo-sub">Région d'Unys · 5e génération</p>
+      <div class="logo-row">
+        <p class="logo-sub">{{ t('app.subtitle') }}</p>
+        <LangSwitch />
+      </div>
     </header>
 
     <slot />
 
     <footer class="foot">
-      Données :
-      <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> ·
-      Projet étudiant non officiel, inspiré de Pokémon Noir et Blanc
+      <i18n-t keypath="app.footer" scope="global">
+        <template #pokeapi>
+          <a href="https://pokeapi.co" target="_blank" rel="noopener"
+            >PokéAPI</a
+          >
+        </template>
+      </i18n-t>
     </footer>
   </div>
 </template>

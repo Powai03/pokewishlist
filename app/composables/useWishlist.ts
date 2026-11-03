@@ -30,10 +30,21 @@ export function useWishlist(): UseWishlist {
   const ready = useState<boolean>('wishlist-ready', () => false)
   const error = useState<string | null>('wishlist-error', () => null)
   const apiBase = useRuntimeConfig().public.apiBase
+  // `$i18n` plutôt que `useI18n()` : ce composable peut aussi être appelé hors d'un composant.
+  const i18n = useNuxtApp().$i18n
+  /** Langue affichée, envoyée à l'API (Accept-Language) pour qu'elle réponde dans la même langue. */
+  const lang = (): string => i18n.locale.value
 
-  /** Message lisible pour une erreur d'appel à l'API. */
-  const messageOf = (e: unknown): string =>
-    e instanceof WishlistApiError ? e.message : "Erreur inattendue de l'API"
+  /**
+   * Message lisible pour une erreur d'appel à l'API :
+   * celui de l'API (déjà dans la bonne langue), ou un message du front traduit ici.
+   */
+  const messageOf = (e: unknown): string => {
+    if (!(e instanceof WishlistApiError)) return i18n.t('api.unexpected')
+    if (e.code === 'status') return i18n.t('api.status', { status: e.status })
+    if (e.code) return i18n.t(`api.${e.code}`)
+    return e.message
+  }
 
   /** Exécute un appel à l'API ; en cas d'échec, garde le message pour l'afficher. */
   async function call<T>(action: () => Promise<T>): Promise<T | undefined> {
@@ -47,7 +58,7 @@ export function useWishlist(): UseWishlist {
   }
 
   async function reload(): Promise<void> {
-    const items = await call(() => fetchWishlist(apiBase))
+    const items = await call(() => fetchWishlist(apiBase, lang()))
     if (items) list.value = items
     ready.value = true
   }
@@ -58,7 +69,7 @@ export function useWishlist(): UseWishlist {
   })
 
   async function add(pokemon: Pokemon): Promise<boolean> {
-    const item = await call(() => postWishlistItem(apiBase, pokemon))
+    const item = await call(() => postWishlistItem(apiBase, pokemon, lang()))
     if (!item) return false
     list.value = addPokemon(list.value, item, item.captured)
     return true
@@ -67,7 +78,7 @@ export function useWishlist(): UseWishlist {
   async function remove(id: number): Promise<void> {
     error.value = null
     try {
-      await deleteWishlistItem(apiBase, id)
+      await deleteWishlistItem(apiBase, id, lang())
     } catch (e: unknown) {
       // 404 : déjà absent côté serveur → on le retire aussi de l'écran ; sinon on affiche l'erreur.
       if (!(e instanceof WishlistApiError && e.status === 404)) {
@@ -81,7 +92,9 @@ export function useWishlist(): UseWishlist {
   async function toggle(id: number): Promise<void> {
     const current = list.value.find((p) => p.id === id)
     if (!current) return
-    const item = await call(() => patchCaptured(apiBase, id, !current.captured))
+    const item = await call(() =>
+      patchCaptured(apiBase, id, !current.captured, lang()),
+    )
     if (item) list.value = list.value.map((p) => (p.id === id ? item : p))
   }
 

@@ -46,14 +46,20 @@ describe('fetchWishlist (GET /wishlist)', () => {
 
     const list = await fetchWishlist(API)
 
-    expect(fake).toHaveBeenCalledWith('http://api.test/wishlist', undefined)
+    expect(fake).toHaveBeenCalledWith(
+      'http://api.test/wishlist',
+      expect.anything(),
+    )
     expect(list).toEqual([{ ...vipelierre, captured: false }])
   })
 
   it('tolère une adresse de base terminée par « / »', async () => {
     const fake = mockFetch(() => json(200, []))
     await fetchWishlist('http://api.test/')
-    expect(fake).toHaveBeenCalledWith('http://api.test/wishlist', undefined)
+    expect(fake).toHaveBeenCalledWith(
+      'http://api.test/wishlist',
+      expect.anything(),
+    )
   })
 
   it('API injoignable → WishlistApiError avec status 0', async () => {
@@ -131,9 +137,10 @@ describe('deleteWishlistItem (DELETE /wishlist/:id)', () => {
 
     await deleteWishlistItem(API, 495)
 
-    expect(fake).toHaveBeenCalledWith('http://api.test/wishlist/495', {
-      method: 'DELETE',
-    })
+    expect(fake).toHaveBeenCalledWith(
+      'http://api.test/wishlist/495',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
   })
 
   it('404 → WishlistApiError avec status 404', async () => {
@@ -163,5 +170,68 @@ describe('parseWishlistItems (vérification des réponses de l’API)', () => {
     expect(list.map((p) => p.id)).toEqual([495, 498])
     expect(list[0]?.types).toEqual(['grass'])
     expect(list[1]?.captured).toBe(true)
+  })
+})
+
+describe('langue : en-tête Accept-Language et erreurs à traduire', () => {
+  /** En-têtes envoyés lors du 1er appel au faux `fetch`. */
+  const sentHeaders = (fake: ReturnType<typeof vi.fn>): Headers =>
+    new Headers((fake.mock.calls[0]?.[1] as RequestInit | undefined)?.headers)
+
+  it('envoie la langue choisie dans Accept-Language (GET, POST, PATCH, DELETE)', async () => {
+    const fake = mockFetch(() => json(200, fromApi))
+    await fetchWishlist(API, 'fr')
+    await postWishlistItem(API, vipelierre, 'es')
+    await patchCaptured(API, 495, true, 'ja')
+    await deleteWishlistItem(API, 495, 'en')
+    const langs = fake.mock.calls.map((call) =>
+      new Headers((call[1] as RequestInit).headers).get('accept-language'),
+    )
+    expect(langs).toEqual(['fr', 'es', 'ja', 'en'])
+  })
+
+  it('garde l’en-tête JSON du POST en plus de la langue', async () => {
+    const fake = mockFetch(() => json(201, fromApi))
+    await postWishlistItem(API, vipelierre, 'fr')
+    expect(sentHeaders(fake).get('content-type')).toBe('application/json')
+  })
+
+  it('sans langue → pas d’en-tête Accept-Language (l’API répond en anglais)', async () => {
+    const fake = mockFetch(() => json(200, []))
+    await fetchWishlist(API)
+    expect(sentHeaders(fake).has('accept-language')).toBe(false)
+  })
+
+  it('message de l’API (déjà traduit par elle) → repris tel quel, sans code', async () => {
+    mockFetch(() =>
+      json(409, { error: 'Le Pokémon #495 est déjà dans la wishlist' }),
+    )
+    await expect(postWishlistItem(API, vipelierre, 'fr')).rejects.toMatchObject(
+      {
+        status: 409,
+        message: 'Le Pokémon #495 est déjà dans la wishlist',
+        code: undefined,
+      },
+    )
+  })
+
+  it('API injoignable → code « unreachable » (message traduit par le front)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('fetch failed')
+      }),
+    )
+    await expect(fetchWishlist(API, 'fr')).rejects.toMatchObject({
+      code: 'unreachable',
+    })
+  })
+
+  it('erreur HTTP sans message de l’API → code « status »', async () => {
+    mockFetch(() => new Response('oups', { status: 503 }))
+    await expect(fetchWishlist(API)).rejects.toMatchObject({
+      status: 503,
+      code: 'status',
+    })
   })
 })
