@@ -132,7 +132,25 @@ Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des vir
 
 ## Fiche d'un Pokémon
 
-`/pokemon/495` ou `/pokemon/snivy` : fiche rendue par le serveur à partir de PokéAPI (nom français, catégorie, types, taille, poids, texte du Pokédex, statistiques). Un Pokémon inconnu ou hors 5e génération renvoie une page **404**. Adresse de PokéAPI : `NUXT_PUBLIC_POKEAPI_BASE` (défaut `https://pokeapi.co/api/v2` ; un faux serveur, `e2e/pokeapi-mock.mjs`, la remplace pendant les tests E2E).
+`/pokemon/495` ou `/pokemon/snivy` : fiche rendue par le serveur à partir de PokéAPI (nom, catégorie, types, taille, poids, texte du Pokédex, statistiques). Un Pokémon inconnu ou hors 5e génération renvoie une page **404**. Adresse de PokéAPI : `NUXT_PUBLIC_POKEAPI_BASE` (défaut `https://pokeapi.co/api/v2` ; un faux serveur, `e2e/pokeapi-mock.mjs`, la remplace pendant les tests E2E).
+
+## Langues (i18n)
+
+Interface en **anglais par défaut**, traduite en français, espagnol et japonais (sélecteur en haut de page ; choix mémorisé dans le cookie `lang`).
+
+- Front : `i18n/locales/{en,fr,es,jp}.json` (module `@nuxtjs/i18n`). La fiche affiche aussi le nom, la catégorie et le texte du Pokédex dans la langue choisie (PokéAPI les fournit).
+- API : `api/src/locales/{en,fr,es,jp}.json`. Langue de chaque réponse : `?lang=fr`, sinon l'en-tête `Accept-Language` (envoyé par le front), sinon l'anglais. Les erreurs ont la forme `{ "error": "<message traduit>", "code": "<code stable>" }`.
+
+Vérifier que chaque fichier a exactement les clés de `en.json` (front et API ; code 1 sinon, lancé en CI) :
+
+```bash
+npm run check:locales
+```
+
+```bash
+curl -X DELETE http://localhost:3002/wishlist/495 -H "Accept-Language: fr"
+# {"error":"Le Pokémon #495 n'est pas dans la wishlist","code":"notInList"}
+```
 
 ## Lancer le front avec l'API
 
