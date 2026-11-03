@@ -131,4 +131,21 @@ export class PostgresWishlistStore implements WishlistStore {
   async close(): Promise<void> {
     await this.sql.end({ timeout: 5 })
   }
+
+  // Likes : table pokemon_likes (migration supabase/migrations/001_likes.sql).
+  async likes(id: number): Promise<number> {
+    const [row] = await this.sql<{ likes: number }[]>`
+      select likes from public.pokemon_likes where pokemon_id = ${id}`
+    return row?.likes ?? 0
+  }
+
+  /** Atomique : insère la ligne au 1er like, sinon incrémente (pas de perte si deux likes arrivent ensemble). */
+  async like(id: number): Promise<number> {
+    const [row] = await this.sql<{ likes: number }[]>`
+      insert into public.pokemon_likes (pokemon_id, likes) values (${id}, 1)
+      on conflict (pokemon_id)
+      do update set likes = public.pokemon_likes.likes + 1, updated_at = now()
+      returning likes`
+    return row?.likes ?? 0
+  }
 }

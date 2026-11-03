@@ -5,6 +5,7 @@ import { cors } from 'hono/cors'
 import { languageDetector } from 'hono/language'
 import { DEFAULT_CORS_ORIGINS, type AppConfig, type AppEnv } from './config.js'
 import { DEFAULT_LANGUAGE, LANGUAGES } from './i18n.js'
+import { likesRoutes } from './routes/likes.js'
 import { fail, wishlistRoutes } from './routes/wishlist.js'
 import { MemoryWishlistStore, type WishlistStore } from './wishlist-store.js'
 
@@ -89,6 +90,7 @@ export function createApp(
   })
 
   app.route('/wishlist', wishlistRoutes(store))
+  app.route('/pokemon', likesRoutes(store))
 
   // Erreur imprévue (ex. base injoignable) : 500 en JSON, sans détail technique pour le client.
   app.onError((err, c) => {

@@ -136,3 +136,16 @@ test.describe('navigation et wishlist', () => {
     expect(list).toMatchObject([{ id: 495, frName: 'Vipélierre' }])
   })
 })
+
+test('like : le compteur augmente et reste après rechargement (enregistré par l’API)', async ({
+  page,
+}) => {
+  await page.goto('/pokemon/495')
+  const count = page.getByTestId('like-count')
+  await expect(count).not.toHaveText('…')
+  const before = Number(await count.textContent())
+  await page.getByTestId('like-button').click()
+  await expect(count).toHaveText(String(before + 1))
+  await page.reload()
+  await expect(count).toHaveText(String(before + 1))
+})

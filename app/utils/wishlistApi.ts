@@ -169,3 +169,36 @@ export async function deleteWishlistItem(
 ): Promise<void> {
   await request(baseUrl, `/wishlist/${id}`, { method: 'DELETE' }, lang)
 }
+
+/** Likes d'une fiche : `{ id, likes }`. */
+function parseLikes(data: unknown): number {
+  const likes = (data as { likes?: unknown } | null)?.likes
+  if (typeof likes !== 'number') {
+    throw new WishlistApiError(
+      500,
+      'Unexpected response from the API',
+      'unexpected',
+    )
+  }
+  return likes
+}
+
+/** GET /pokemon/:id/likes : nombre de likes de la fiche. */
+export async function fetchLikes(
+  baseUrl: string,
+  id: number,
+  lang?: string,
+): Promise<number> {
+  return parseLikes(await request(baseUrl, `/pokemon/${id}/likes`, {}, lang))
+}
+
+/** POST /pokemon/:id/likes : un like de plus ; renvoie le nouveau total. */
+export async function postLike(
+  baseUrl: string,
+  id: number,
+  lang?: string,
+): Promise<number> {
+  return parseLikes(
+    await request(baseUrl, `/pokemon/${id}/likes`, { method: 'POST' }, lang),
+  )
+}

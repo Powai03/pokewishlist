@@ -65,6 +65,10 @@ export interface WishlistStore {
   setCaptured(id: number, captured: boolean): Promise<WishlistItem | undefined>
   /** Retire un Pokémon ; renvoie l'élément retiré, ou `undefined` s'il n'était pas là. */
   remove(id: number): Promise<WishlistItem | undefined>
+  /** Nombre de likes d'une fiche (0 si aucun). */
+  likes(id: number): Promise<number>
+  /** Ajoute un like (opération atomique) et renvoie le nouveau total. */
+  like(id: number): Promise<number>
 }
 
 export function isGen5(id: number): boolean {
@@ -205,5 +209,17 @@ export class MemoryWishlistStore implements WishlistStore {
     const item = this.find(id)
     if (item) this.items = this.items.filter((i) => i.id !== id)
     return item
+  }
+
+  private likeCounts = new Map<number, number>()
+
+  async likes(id: number): Promise<number> {
+    return this.likeCounts.get(id) ?? 0
+  }
+
+  async like(id: number): Promise<number> {
+    const total = (this.likeCounts.get(id) ?? 0) + 1
+    this.likeCounts.set(id, total)
+    return total
   }
 }

@@ -319,3 +319,24 @@ describe('CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST')
   })
 })
+
+// ── Likes des fiches ──────────────────────────────────────────────────────────
+describe('GET / POST /pokemon/:id/likes', () => {
+  it('0 au départ, puis +1 à chaque POST', async () => {
+    expect(await (await app.request('/pokemon/495/likes')).json()).toEqual({
+      id: 495,
+      likes: 0,
+    })
+    await app.request('/pokemon/495/likes', { method: 'POST' })
+    const res = await app.request('/pokemon/495/likes', { method: 'POST' })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: 495, likes: 2 })
+  })
+
+  it('400 hors 5e génération ou id non entier', async () => {
+    expect(
+      (await app.request('/pokemon/25/likes', { method: 'POST' })).status,
+    ).toBe(400)
+    expect((await app.request('/pokemon/abc/likes')).status).toBe(400)
+  })
+})

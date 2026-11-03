@@ -110,6 +110,22 @@ async function onAdd(): Promise<void> {
   await add(p)
   adding.value = false
 }
+// Likes de la fiche (API → table pokemon_likes) : chargés dans le navigateur, pour rester à jour
+// même sur une fiche pré-rendue.
+const apiBase = useRuntimeConfig().public.apiBase
+const likes = ref<number | null>(null)
+const liking = ref(false)
+onMounted(async () => {
+  likes.value = await fetchLikes(apiBase, p.id, locale.value).catch(() => null)
+})
+async function onLike(): Promise<void> {
+  liking.value = true
+  likes.value = await postLike(apiBase, p.id, locale.value).catch(
+    () => likes.value,
+  )
+  liking.value = false
+}
+
 const addLabel = computed<string>(() => {
   if (!ready.value) return t('sheet.loading')
   if (inList.value) return t('sheet.inList')
@@ -206,6 +222,19 @@ const addLabel = computed<string>(() => {
             @click="onAdd"
           >
             {{ addLabel }}
+          </button>
+          <button
+            type="button"
+            class="cmd cmd-like"
+            data-testid="like-button"
+            :aria-label="t('sheet.likeLabel', { name })"
+            :disabled="liking || likes === null"
+            @click="onLike"
+          >
+            ♥ {{ t('sheet.like') }}
+            <span class="like-count" data-testid="like-count">{{
+              likes ?? '…'
+            }}</span>
           </button>
           <NuxtLink to="/" class="cmd cmd-run">{{ t('sheet.back') }}</NuxtLink>
         </div>
@@ -405,7 +434,17 @@ const addLabel = computed<string>(() => {
   background: #48c8f0;
 }
 .sheet-commands {
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2fr 1.2fr 1fr;
+}
+.cmd-like {
+  color: #fff;
+  background: linear-gradient(#f06292, #c2185b);
+}
+.like-count {
+  margin-left: 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #0003;
 }
 .dex-nav {
   display: flex;
