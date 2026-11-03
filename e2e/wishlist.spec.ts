@@ -308,3 +308,40 @@ test("API injoignable : message d'erreur, l'application ne plante pas", async ({
   await expect(page.getByLabel('Nom ou numéro')).toBeEnabled()
   expect(pageErrors).toEqual([])
 })
+
+// ── CORS, dans un VRAI navigateur sans interception ───────────────────────────
+// Attention : dès qu'un test utilise `page.route()` (ici pour simuler PokéAPI), Playwright répond
+// lui-même aux requêtes CORS préalables (« preflight ») : les tests ci-dessus ne voient donc PAS
+// les erreurs CORS. Ce test utilise un contexte neuf, SANS aucune route, comme un vrai utilisateur.
+test('CORS : depuis la page du front, le navigateur peut appeler GET, POST, PATCH et DELETE', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext() // aucun page.route() ici
+  const page = await context.newPage()
+  await page.goto(baseURL!)
+
+  const results = await page.evaluate(async (api) => {
+    const call = async (method: string, path: string, body?: unknown) => {
+      try {
+        const res = await fetch(`${api}${path}`, {
+          method,
+          headers: body ? { 'content-type': 'application/json' } : undefined,
+          body: body ? JSON.stringify(body) : undefined,
+        })
+        return `${method} ${res.status}`
+      } catch {
+        return `${method} BLOQUÉ par le navigateur`
+      }
+    }
+    return [
+      await call('GET', '/wishlist'),
+      await call('POST', '/wishlist', { id: 495, name: 'snivy' }),
+      await call('PATCH', '/wishlist/495', { captured: true }),
+      await call('DELETE', '/wishlist/495'),
+    ]
+  }, API_URL)
+
+  expect(results).toEqual(['GET 200', 'POST 201', 'PATCH 200', 'DELETE 200'])
+  await context.close()
+})

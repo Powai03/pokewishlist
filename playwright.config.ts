@@ -22,19 +22,20 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   // Démarre les deux serveurs de production (après `npm run build` et `npm --prefix api run build`).
+  // En CI, ils sont déjà démarrés par des étapes dédiées du workflow : Playwright les réutilise.
   webServer: [
     {
       command: 'node api/dist/index.js',
       url: `${API_URL}/health`,
       env: { PORT: '3101', NODE_ENV: 'test', CORS_ORIGIN: FRONT_URL },
-      reuseExistingServer: false,
+      reuseExistingServer: !!process.env.CI,
     },
     {
       command: 'node .output/server/index.mjs',
       url: FRONT_URL,
       // Le front est configuré pour appeler l'API de test (runtimeConfig, sans rebuild).
       env: { PORT: '3100', NUXT_PUBLIC_API_BASE: API_URL },
-      reuseExistingServer: false,
+      reuseExistingServer: !!process.env.CI,
     },
   ],
 })
