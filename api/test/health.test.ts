@@ -37,7 +37,10 @@ describe('GET /health', () => {
   it('route inconnue → 404 en JSON', async () => {
     const res = await app.request('/inconnue')
     expect(res.status).toBe(404)
-    expect(await res.json()).toEqual({ error: 'Not Found', path: '/inconnue' })
+    expect(await res.json()).toEqual({
+      error: 'Route not found: /inconnue',
+      code: 'routeNotFound',
+    })
   })
 
   it('POST /health → 404 (seul GET est prévu)', async () => {

@@ -3,7 +3,11 @@
 //   POST   /wishlist      → 201 + le Pokémon créé (400 si invalide, 409 si doublon ou liste pleine)
 //   PATCH  /wishlist/:id  → 200 + le Pokémon modifié ({ captured }) (400 si invalide, 404 s'il n'est pas dans la liste)
 //   DELETE /wishlist/:id  → 200 + le Pokémon retiré (400 si id invalide, 404 s'il n'est pas dans la liste)
-import { Hono } from 'hono'
+//
+// Les messages d'erreur sont dans la langue de la requête (?lang=… ou Accept-Language, anglais par défaut).
+import { Hono, type Context } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
+import { translate, type MessageKey, type MessageParams } from '../i18n.js'
 import {
   WISHLIST_MAX,
   validateInput,
@@ -13,7 +17,33 @@ import {
 
 /** Format commun des réponses d'erreur. */
 export interface ErrorResponse {
+  /** Message lisible, dans la langue de la requête. */
   error: string
+  /** Code stable, identique dans toutes les langues (ex. « duplicate ») : à utiliser dans un programme. */
+  code: MessageKey
+}
+
+/**
+ * Répond une erreur JSON traduite dans la langue détectée pour cette requête.
+ * (`c.get('language')` est posé par le middleware `languageDetector` de app.ts ; Hono en connaît le type.)
+ */
+export function fail(
+  c: Context,
+  status: ContentfulStatusCode,
+  key: MessageKey,
+  params?: MessageParams,
+): Response {
+  const body: ErrorResponse = {
+    error: translate(c.get('language'), key, params),
+    code: key,
+  }
+  return c.json(body, status)
+}
+
+/** L'id de l'adresse /wishlist/:id, ou null s'il n'est pas un entier. */
+function parseId(raw: string): number | null {
+  const id = Number(raw)
+  return Number.isInteger(id) ? id : null
 }
 
 export function wishlistRoutes(store: WishlistStore): Hono {
@@ -27,28 +57,25 @@ export function wishlistRoutes(store: WishlistStore): Hono {
     try {
       body = await c.req.json()
     } catch {
-      return c.json<ErrorResponse>({ error: 'Corps JSON invalide' }, 400)
+      return fail(c, 400, 'invalidJson')
     }
 
     // 2. Valider la forme et les règles (5e génération, nom non vide).
     const input = validateInput(body)
-    if (!input.ok) return c.json<ErrorResponse>({ error: input.error }, 400)
+    if (!input.ok) return fail(c, 400, input.error.key, input.error.params)
 
     // 3. Ajouter : 409 (conflit) si déjà présent ou si la liste est pleine ;
     //    400 si la base refuse une donnée (ex. type inconnu, contrôlé par une contrainte SQL).
     const result = await store.add(input.value)
-    if (!result.ok && result.reason === 'invalid') {
-      return c.json<ErrorResponse>(
-        { error: `Donnée refusée par la base (${result.detail})` },
-        400,
-      )
-    }
     if (!result.ok) {
-      const error =
-        result.reason === 'duplicate'
-          ? `Le Pokémon #${input.value.id} est déjà dans la wishlist`
-          : `La wishlist est pleine (${WISHLIST_MAX} Pokémon maximum)`
-      return c.json<ErrorResponse>({ error }, 409)
+      switch (result.reason) {
+        case 'invalid':
+          return fail(c, 400, 'rejectedByDb', { detail: result.detail })
+        case 'duplicate':
+          return fail(c, 409, 'duplicate', { id: input.value.id })
+        case 'full':
+          return fail(c, 409, 'full', { max: WISHLIST_MAX })
+      }
     }
 
     // 4. 201 Created + en-tête Location : l'adresse de la ressource créée.
@@ -57,47 +84,27 @@ export function wishlistRoutes(store: WishlistStore): Hono {
   })
 
   routes.patch('/:id', async (c) => {
-    const id = Number(c.req.param('id'))
-    if (!Number.isInteger(id)) {
-      return c.json<ErrorResponse>(
-        { error: '« id » doit être un nombre entier' },
-        400,
-      )
-    }
+    const id = parseId(c.req.param('id'))
+    if (id === null) return fail(c, 400, 'idInteger')
     let body: unknown
     try {
       body = await c.req.json()
     } catch {
-      return c.json<ErrorResponse>({ error: 'Corps JSON invalide' }, 400)
+      return fail(c, 400, 'invalidJson')
     }
     const patch = validatePatch(body)
-    if (!patch.ok) return c.json<ErrorResponse>({ error: patch.error }, 400)
+    if (!patch.ok) return fail(c, 400, patch.error.key, patch.error.params)
 
     const item = await store.setCaptured(id, patch.value.captured)
-    if (!item) {
-      return c.json<ErrorResponse>(
-        { error: `Le Pokémon #${id} n'est pas dans la wishlist` },
-        404,
-      )
-    }
+    if (!item) return fail(c, 404, 'notInList', { id })
     return c.json(item, 200)
   })
 
   routes.delete('/:id', async (c) => {
-    const id = Number(c.req.param('id'))
-    if (!Number.isInteger(id)) {
-      return c.json<ErrorResponse>(
-        { error: '« id » doit être un nombre entier' },
-        400,
-      )
-    }
+    const id = parseId(c.req.param('id'))
+    if (id === null) return fail(c, 400, 'idInteger')
     const removed = await store.remove(id)
-    if (!removed) {
-      return c.json<ErrorResponse>(
-        { error: `Le Pokémon #${id} n'est pas dans la wishlist` },
-        404,
-      )
-    }
+    if (!removed) return fail(c, 404, 'notInList', { id })
     return c.json({ deleted: removed }, 200)
   })
 

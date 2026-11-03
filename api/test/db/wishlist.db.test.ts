@@ -172,7 +172,8 @@ describe('CRUD par HTTP (routes Hono + PostgreSQL)', () => {
     const res = await post(pokemon(498, ['plante']))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({
-      error: 'Donnée refusée par la base (wishlist_types_known)',
+      error: 'Data rejected by the database (wishlist_types_known)',
+      code: 'rejectedByDb',
     })
     expect(await rowsInDb()).toEqual([])
   })
@@ -193,7 +194,8 @@ describe('doublons', () => {
     const res = await post(pokemon(495))
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({
-      error: 'Le Pokémon #495 est déjà dans la wishlist',
+      error: 'Pokémon #495 is already in the wishlist',
+      code: 'duplicate',
     })
   })
 })
@@ -212,7 +214,8 @@ describe('limite de 6', () => {
     const res = await post(pokemon(644))
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({
-      error: 'La wishlist est pleine (6 Pokémon maximum)',
+      error: 'The wishlist is full (6 Pokémon maximum)',
+      code: 'full',
     })
   })
 

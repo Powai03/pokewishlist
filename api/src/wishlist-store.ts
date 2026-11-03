@@ -7,6 +7,10 @@
 //
 // Les règles métier sont les mêmes que côté front (app/utils/wishlist.ts) :
 // 5e génération uniquement, pas de doublon, 6 Pokémon maximum.
+//
+// Les erreurs de validation sont des CLÉS de message (`Translatable`), traduites par les routes
+// dans la langue de la requête (voir i18n.ts).
+import type { Translatable } from './i18n.js'
 
 /** 5e génération (région d'Unys) : de Victini (#494) à Genesect (#649). */
 export const GEN5 = { first: 494, last: 649 } as const
@@ -37,9 +41,9 @@ export interface WishlistItem extends WishlistInput {
   addedAt: string
 }
 
-/** Résultat d'une validation : soit la valeur propre, soit un message d'erreur. */
+/** Résultat d'une validation : soit la valeur propre, soit l'erreur (à traduire). */
 export type Validation<T> =
-  { ok: true; value: T } | { ok: false; error: string }
+  { ok: true; value: T } | { ok: false; error: Translatable }
 
 /** Résultat d'un ajout : l'élément créé, ou la raison du refus. */
 export type AddResult =
@@ -71,7 +75,7 @@ const isShortText = (value: unknown, max: number): value is string =>
   typeof value === 'string' && value.trim() !== '' && value.length <= max
 
 /** Champ optionnel « adresse d'image » : absent/null → null ; sinon une URL http(s) raisonnable. */
-function optionalUrl(value: unknown): Validation<string | null> {
+function optionalUrl(field: string, value: unknown): Validation<string | null> {
   if (value === undefined || value === null) return { ok: true, value: null }
   if (
     typeof value === 'string' &&
@@ -80,8 +84,11 @@ function optionalUrl(value: unknown): Validation<string | null> {
   ) {
     return { ok: true, value }
   }
-  return { ok: false, error: 'doit être une adresse http(s) ou null' }
+  return { ok: false, error: { key: 'urlInvalid', params: { field } } }
 }
+
+/** Longueur maximale des noms (comme la contrainte SQL de supabase/init.sql). */
+const NAME_MAX = 50
 
 /**
  * Vérifie le corps de POST /wishlist, qui arrive en `unknown` (le client peut envoyer n'importe quoi).
@@ -89,44 +96,44 @@ function optionalUrl(value: unknown): Validation<string | null> {
  */
 export function validateInput(body: unknown): Validation<WishlistInput> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
-    return { ok: false, error: 'Le corps doit être un objet JSON' }
+    return { ok: false, error: { key: 'bodyNotObject' } }
   }
   const b = body as Record<string, unknown>
   if (typeof b.id !== 'number' || !Number.isInteger(b.id)) {
-    return { ok: false, error: '« id » doit être un nombre entier' }
+    return { ok: false, error: { key: 'idInteger' } }
   }
   if (!isGen5(b.id)) {
     return {
       ok: false,
-      error: `« id » doit être un Pokémon de 5e génération (${GEN5.first} à ${GEN5.last})`,
+      error: { key: 'idGen5', params: { first: GEN5.first, last: GEN5.last } },
     }
   }
   if (typeof b.name !== 'string' || b.name.trim() === '') {
-    return { ok: false, error: '« name » doit être un texte non vide' }
+    return { ok: false, error: { key: 'nameRequired' } }
   }
-  if (b.name.trim().length > 50) {
-    return { ok: false, error: '« name » ne doit pas dépasser 50 caractères' }
-  }
-  if (b.frName !== undefined && !isShortText(b.frName, 50)) {
+  if (b.name.trim().length > NAME_MAX) {
     return {
       ok: false,
-      error: '« frName » doit être un texte de 1 à 50 caractères',
+      error: { key: 'nameTooLong', params: { max: NAME_MAX } },
     }
   }
-  const sprite = optionalUrl(b.sprite)
-  if (!sprite.ok) return { ok: false, error: `« sprite » ${sprite.error}` }
-  const icon = optionalUrl(b.icon)
-  if (!icon.ok) return { ok: false, error: `« icon » ${icon.error}` }
+  if (b.frName !== undefined && !isShortText(b.frName, NAME_MAX)) {
+    return {
+      ok: false,
+      error: { key: 'frNameInvalid', params: { max: NAME_MAX } },
+    }
+  }
+  const sprite = optionalUrl('sprite', b.sprite)
+  if (!sprite.ok) return sprite
+  const icon = optionalUrl('icon', b.icon)
+  if (!icon.ok) return icon
   const types = b.types ?? []
   if (
     !Array.isArray(types) ||
     types.length > 2 ||
     !types.every((t) => isShortText(t, 20))
   ) {
-    return {
-      ok: false,
-      error: '« types » doit être une liste de 2 textes au plus',
-    }
+    return { ok: false, error: { key: 'typesInvalid' } }
   }
   const name = b.name.trim()
   return {
@@ -156,7 +163,7 @@ export function validatePatch(
       value: { captured: (body as { captured: boolean }).captured },
     }
   }
-  return { ok: false, error: '« captured » doit être true ou false' }
+  return { ok: false, error: { key: 'capturedInvalid' } }
 }
 
 /** Stockage EN MÉMOIRE : un simple tableau, perdu à chaque redémarrage (tests, CI, dev sans base). */

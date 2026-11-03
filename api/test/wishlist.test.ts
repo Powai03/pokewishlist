@@ -98,7 +98,10 @@ describe('POST /wishlist', () => {
     it('JSON invalide → 400 (pas de plantage 500)', async () => {
       const res = await post(undefined, '{pas du json')
       expect(res.status).toBe(400)
-      expect(await res.json()).toEqual({ error: 'Corps JSON invalide' })
+      expect(await res.json()).toEqual({
+        error: 'Invalid JSON body',
+        code: 'invalidJson',
+      })
     })
   })
 
@@ -108,7 +111,10 @@ describe('POST /wishlist', () => {
       const res = await post(vipelierre)
 
       expect(res.status).toBe(409)
-      expect(((await res.json()) as ErrorResponse).error).toContain('déjà')
+      expect(await res.json()).toEqual({
+        error: 'Pokémon #495 is already in the wishlist',
+        code: 'duplicate',
+      })
       expect(await list()).toHaveLength(1)
     })
 
@@ -119,7 +125,10 @@ describe('POST /wishlist', () => {
       const res = await post({ id: 644, name: 'Zekrom' })
 
       expect(res.status).toBe(409)
-      expect(((await res.json()) as ErrorResponse).error).toContain('pleine')
+      expect(await res.json()).toEqual({
+        error: 'The wishlist is full (6 Pokémon maximum)',
+        code: 'full',
+      })
       expect(await list()).toHaveLength(WISHLIST_MAX)
     })
   })
@@ -148,9 +157,7 @@ describe('DELETE /wishlist/:id', () => {
   it('404 si le Pokémon n’est pas dans la wishlist', async () => {
     const res = await del(495)
     expect(res.status).toBe(404)
-    expect(((await res.json()) as ErrorResponse).error).toContain(
-      'pas dans la wishlist',
-    )
+    expect(((await res.json()) as ErrorResponse).code).toBe('notInList')
   })
 
   it('404 la deuxième fois (déjà retiré)', async () => {

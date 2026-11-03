@@ -1,0 +1,18 @@
+{
+  "invalidJson": "Corps JSON invalide",
+  "bodyNotObject": "Le corps doit être un objet JSON",
+  "idInteger": "« id » doit être un nombre entier",
+  "idGen5": "« id » doit être un Pokémon de 5e génération ({first} à {last})",
+  "nameRequired": "« name » doit être un texte non vide",
+  "nameTooLong": "« name » ne doit pas dépasser {max} caractères",
+  "frNameInvalid": "« frName » doit être un texte de 1 à {max} caractères",
+  "urlInvalid": "« {field} » doit être une adresse http(s) ou null",
+  "typesInvalid": "« types » doit être une liste de 2 textes au plus",
+  "capturedInvalid": "« captured » doit être true ou false",
+  "duplicate": "Le Pokémon #{id} est déjà dans la wishlist",
+  "full": "La wishlist est pleine ({max} Pokémon maximum)",
+  "notInList": "Le Pokémon #{id} n'est pas dans la wishlist",
+  "rejectedByDb": "Donnée refusée par la base ({detail})",
+  "routeNotFound": "Route introuvable : {path}",
+  "internal": "Erreur interne du serveur"
+}
