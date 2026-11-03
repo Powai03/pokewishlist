@@ -4,8 +4,11 @@ name: CI/CD
 #
 #   i18n ───────────┬──────────────────────────────────────────────┐
 #   API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬─▶ API · Build + /health ─┐
-#                   └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E ─▶ Migrate DB ─▶ Deploy API ─▶ Deploy (Vercel)
+#                   └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E
 #   Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘
+#
+#   puis, sur main uniquement :  E2E ─▶ Migrate DB ─▶ Deploy API ─┬─▶ Deploy (Vercel, SSR)
+#                                                                 └─▶ Deploy SSG (S3 + CloudFront)
 #
 # · Un job ne démarre que si ceux dont il dépend ont RÉUSSI : un check rouge arrête la suite.
 # · Les déploiements ne tournent que sur un push dans main (donc après un merge), jamais pour une PR.
@@ -458,6 +461,96 @@ jobs:
           fi
           echo "CORS (OPTIONS /wishlist) → autorisé pour http://localhost:3001"
           echo "✔ L'API en ligne exécute le commit $DEPLOY_SHA et ses routes répondent"
+
+  # Version STATIQUE (SSG) du site sur S3 + CloudFront (étapes 12-13 du cours), en parallèle de Vercel.
+  # nuxt generate → aws s3 sync → invalidation du cache CloudFront → vérification en ligne.
+  # Même connexion AWS sans clé (OIDC) ; le rôle ne peut écrire que dans CE bucket et invalider CETTE distribution.
+  deploy-ssg:
+    name: Deploy SSG (S3 + CloudFront)
+    needs: deploy-api
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.SSG_URL }}
+    concurrency:
+      group: deploy-production-ssg
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      DEPLOY_SHA: ${{ github.sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      API_URL: ${{ vars.API_URL }}
+      SSG_BUCKET: ${{ vars.SSG_BUCKET }}
+      SSG_DISTRIBUTION_ID: ${{ vars.SSG_DISTRIBUTION_ID }}
+      SSG_URL: ${{ vars.SSG_URL }}
+    steps:
+      - name: Vérifier la configuration (variables de l'environnement production)
+        run: |
+          missing=0
+          for name in AWS_REGION API_URL SSG_BUCKET SSG_DISTRIBUTION_ID SSG_URL; do
+            if [ -z "${!name}" ]; then echo "::error::Variable manquante : $name"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/node-modules
+
+      - name: '[1/4] Générer le site statique (nuxt generate, commit ${{ env.DEPLOY_SHA }})'
+        env:
+          NITRO_PRESET: static
+          GIT_COMMIT: ${{ env.DEPLOY_SHA }}
+          NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }} # la même API AWS que le site SSR
+        run: |
+          npx nuxt generate
+          echo "$(find .output/public -name '*.html' | wc -l) pages HTML générées"
+
+      - name: '[2/4] Se connecter à AWS (OIDC, droits temporaires)'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: pokewishlist-ssg-${{ github.run_id }}
+
+      - name: '[3/4] Envoyer sur S3 et invalider le cache CloudFront'
+        run: |
+          # Fichiers JS/CSS (nom contenant leur empreinte) : cache d'un an ; HTML et données : toujours revalidés.
+          aws s3 sync .output/public "s3://$SSG_BUCKET" --exclude '*' --include '_nuxt/*' \
+            --cache-control 'public,max-age=31536000,immutable' --only-show-errors
+          aws s3 sync .output/public "s3://$SSG_BUCKET" --exclude '_nuxt/*' \
+            --cache-control 'public,max-age=0,must-revalidate' --only-show-errors
+          # Les fichiers des anciennes versions sont retirés seulement maintenant (les pages déjà ouvertes les utilisent encore).
+          aws s3 sync .output/public "s3://$SSG_BUCKET" --delete --only-show-errors
+          id=$(aws cloudfront create-invalidation --distribution-id "$SSG_DISTRIBUTION_ID" \
+            --paths '/*' --query Invalidation.Id --output text)
+          echo "Invalidation $id…"
+          aws cloudfront wait invalidation-completed --distribution-id "$SSG_DISTRIBUTION_ID" --id "$id"
+
+      - name: '[4/4] Vérifier en ligne : HTML statique de ce commit, fiches, même API AWS'
+        run: |
+          for i in $(seq 1 10); do
+            html=$(curl --silent --max-time 20 "$SSG_URL/" || true)
+            commit=$(printf '%s' "$html" | grep -o '<meta name="app-commit" content="[0-9a-f]*"' | sed 's/.*content="//; s/"$//')
+            echo "[$i/10] $SSG_URL/ → commit ${commit:-?}"
+            [ "$commit" = "$DEPLOY_SHA" ] && break
+            sleep 5
+          done
+          [ "$commit" = "$DEPLOY_SHA" ] || { echo "::error::Le site statique ne porte pas le commit $DEPLOY_SHA"; exit 1; }
+          # Une fiche générée : vrai HTML (pas une coquille vide) et l'adresse de la même API AWS.
+          code=$(curl --silent --max-time 20 -o fiche.html -w '%{http_code}' "$SSG_URL/pokemon/snivy")
+          if [ "$code" != 200 ] || ! grep -q '<title>Snivy' fiche.html; then
+            echo "::error::/pokemon/snivy → $code, sans « Snivy »"; exit 1
+          fi
+          grep -q "apiBase:\"$API_URL\"" fiche.html \
+            || { echo "::error::La fiche n'utilise pas l'API $API_URL"; exit 1; }
+          code=$(curl --silent --max-time 20 -o /dev/null -w '%{http_code}' "$SSG_URL/pokemon/inexistant")
+          [ "$code" = 404 ] || { echo "::error::page absente → $code au lieu de 404"; exit 1; }
+          echo "GET /pokemon/snivy → 200 (HTML généré, API $API_URL) ; page absente → 404"
+          echo "✔ Le site statique en ligne exécute le commit $DEPLOY_SHA"
 
   # Front Nuxt (rendu serveur, SSR) sur Vercel, APRÈS l'API (le nouveau front peut avoir besoin de la nouvelle API).
   # Le déploiement automatique de Vercel à chaque push est coupé (vercel.json) : c'est CE job qui déploie.
