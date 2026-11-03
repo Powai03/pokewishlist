@@ -466,6 +466,9 @@ jobs:
         env:
           GIT_COMMIT: ${{ env.DEPLOY_SHA }}
           NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }}
+          # Imposé : dans GitHub Actions, Nitro détecterait la CI et produirait un serveur Node (.output)
+          # au lieu du format Vercel (.vercel/output).
+          NITRO_PRESET: vercel
         run: npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
 
       - name: '[3/4] Mettre en ligne (production)'
