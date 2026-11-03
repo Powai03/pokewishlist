@@ -60,7 +60,9 @@
     "full": "Wishlist llena",
     "add": "Añadir",
     "back": "Volver",
-    "neighbours": "Pokémon vecinos"
+    "neighbours": "Pokémon vecinos",
+    "like": "Me gusta",
+    "likeLabel": "Me gusta {name}"
   },
   "error": {
     "notFoundTitle": "Pokémon no encontrado",

@@ -121,13 +121,15 @@ Variables d'environnement : `PORT` (3002 par défaut), `NODE_ENV` (`development`
 
 ### Routes
 
-| Méthode  | Route           | Succès                                         | Erreurs                                             |
-| -------- | --------------- | ---------------------------------------------- | --------------------------------------------------- |
-| `GET`    | `/health`       | `200` état, version, environnement             |                                                     |
-| `GET`    | `/wishlist`     | `200` liste des Pokémon                        |                                                     |
-| `POST`   | `/wishlist`     | `201` Pokémon créé (+ en-tête `Location`)      | `400` corps invalide, `409` doublon ou liste pleine |
-| `PATCH`  | `/wishlist/:id` | `200` Pokémon modifié (`{ "captured": true }`) | `400` corps invalide, `404` absent de la liste      |
-| `DELETE` | `/wishlist/:id` | `200` Pokémon retiré                           | `400` id invalide, `404` absent de la liste         |
+| Méthode  | Route                | Succès                                         | Erreurs                                             |
+| -------- | -------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| `GET`    | `/health`            | `200` état, version, environnement             |                                                     |
+| `GET`    | `/wishlist`          | `200` liste des Pokémon                        |                                                     |
+| `POST`   | `/wishlist`          | `201` Pokémon créé (+ en-tête `Location`)      | `400` corps invalide, `409` doublon ou liste pleine |
+| `PATCH`  | `/wishlist/:id`      | `200` Pokémon modifié (`{ "captured": true }`) | `400` corps invalide, `404` absent de la liste      |
+| `DELETE` | `/wishlist/:id`      | `200` Pokémon retiré                           | `400` id invalide, `404` absent de la liste         |
+| `GET`    | `/pokemon/:id/likes` | `200` `{ id, likes }`                          | `400` hors 5e génération                            |
+| `POST`   | `/pokemon/:id/likes` | `200` `{ id, likes }` (un like de plus)        | `400` hors 5e génération                            |
 
 Corps de `POST /wishlist` : `{ "id": 495, "name": "Vipélierre" }` (5e génération : 494 à 649, 6 Pokémon maximum).
 
@@ -142,6 +144,16 @@ La wishlist est enregistrée dans une base PostgreSQL hébergée par Supabase qu
 Une donnée refusée par une contrainte de la base (ex. type inconnu) renvoie `400`.
 
 Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des virgules ; défaut : `http://localhost:3000,http://localhost:3001`).
+
+### Migrations SQL
+
+`supabase/init.sql` crée le schéma de départ ; les évolutions sont dans `supabase/migrations/NNN_nom.sql` (ex. `001_likes.sql`). Le runner maison (`api/src/migrations.ts`) les applique dans l'ordre, **une seule fois** chacune, et les note dans la table `schema_migrations` (version, empreinte SHA-256, date) :
+
+```bash
+cd api && npm run migrate   # base de DATABASE_URL (api/.env) ; sans risque à relancer
+```
+
+Chaque migration et sa ligne du journal sont dans la même transaction (tout ou rien) ; un verrou PostgreSQL empêche deux exécutions simultanées ; une migration modifiée après application est refusée.
 
 ## Fiche d'un Pokémon
 

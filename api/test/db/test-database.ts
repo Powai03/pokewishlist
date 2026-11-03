@@ -10,6 +10,7 @@ import { createServer } from 'node:net'
 import { PGlite } from '@electric-sql/pglite'
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket'
 import postgres from 'postgres'
+import { runMigrations } from '../../src/migrations.js'
 
 const INIT_SQL = new URL('../../../supabase/init.sql', import.meta.url)
 
@@ -76,9 +77,11 @@ export async function startTestDatabase(): Promise<TestDatabase> {
   const sql = postgres(url, { max: 1, ssl: false, onnotice: () => {} })
   // Le schéma de production, appliqué tel quel (requête « simple » : plusieurs instructions d'un coup).
   await sql.unsafe(readFileSync(INIT_SQL, 'utf8')).simple()
+  // Puis les migrations (supabase/migrations), avec le runner de production.
+  await runMigrations(sql)
 
   const clean = async (): Promise<void> => {
-    await sql`truncate table public.wishlist`
+    await sql`truncate table public.wishlist, public.pokemon_likes`
   }
 
   return {

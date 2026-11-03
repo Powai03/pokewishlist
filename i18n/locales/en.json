@@ -60,7 +60,9 @@
     "full": "Wishlist full",
     "add": "Add",
     "back": "Back",
-    "neighbours": "Neighbouring Pokémon"
+    "neighbours": "Neighbouring Pokémon",
+    "like": "Like",
+    "likeLabel": "Like {name}"
   },
   "error": {
     "notFoundTitle": "Pokémon not found",

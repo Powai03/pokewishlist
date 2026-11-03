@@ -60,7 +60,9 @@
     "full": "ウィッシュリストが いっぱい",
     "add": "ついか",
     "back": "もどる",
-    "neighbours": "となりの ポケモン"
+    "neighbours": "となりの ポケモン",
+    "like": "いいね",
+    "likeLabel": "{name} に いいね"
   },
   "error": {
     "notFoundTitle": "ポケモンが みつかりません",
