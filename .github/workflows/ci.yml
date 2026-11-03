@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ le job e2e plus bas).
+  # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ traductions, e2e et API plus bas).
   # Chaque check porte le nom de son OUTIL ; `cmd` affiche la commande réellement lancée
   # (celle du script npm correspondant dans package.json).
   check:
@@ -49,6 +49,22 @@ jobs:
 
       - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
         run: npm run ${{ matrix.script }}
+
+  # Traductions : chaque fichier de langue (front i18n/locales, API api/src/locales) doit avoir
+  # exactement les clés de en.json. Une clé manquante → le script sort en code 1 → check rouge.
+  # Aucune dépendance : pas de `npm ci`, le job dure quelques secondes.
+  locales:
+    name: Traductions (clés vs en.json)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: node scripts/check-locales.mjs (npm run check:locales)
+        run: node scripts/check-locales.mjs
 
   # Test de bout en bout : un vrai navigateur ajoute un Pokémon, rafraîchit, vérifie la liste.
   # Le front buildé parle à la VRAIE API buildée (playwright.config.ts démarre les deux serveurs).
