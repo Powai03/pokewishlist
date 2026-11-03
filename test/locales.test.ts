@@ -1,4 +1,3 @@
-// Fichiers de traduction du front (i18n/locales/*.json) et textes de PokéAPI selon la langue.
 import { describe, expect, it } from 'vitest'
 import en from '../i18n/locales/en.json'
 import es from '../i18n/locales/es.json'
@@ -7,8 +6,6 @@ import ja from '../i18n/locales/jp.json'
 import { POKEMON_TYPES, STAT_KEYS } from '../app/types/pokemon'
 import { LOCALES, inLocale, localize, pokemonName } from '../app/utils/locale'
 
-// Mêmes clés, mêmes variables, aucun texte vide : vérifié par scripts/check-locales.mjs
-// (lancé en CI, testé dans checkLocales.test.ts). Ici : le contenu attendu par le code.
 const FILES = { en, fr, es, ja } as const
 
 describe('fichiers de traduction du front', () => {
@@ -32,7 +29,7 @@ describe('textes de PokéAPI selon la langue', () => {
     { name: 'Snivy', language: { name: 'en' } },
     { name: 'Vipélierre', language: { name: 'fr' } },
     { name: 'ツタージャ', language: { name: 'ja-Hrkt' } },
-    { name: '모부기', language: { name: 'ko' } }, // langue non proposée : ignorée
+    { name: '모부기', language: { name: 'ko' } },
   ]
 
   it('localize : un texte par langue de l’appli, langues inconnues ignorées', () => {

@@ -1,4 +1,3 @@
-# Prettier ignore déjà ce qui est dans .gitignore ; on ajoute les fichiers générés.
 dist/
 coverage/
 package-lock.json

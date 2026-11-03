@@ -1,8 +1,5 @@
-// Couleurs des types Pokémon (palette proche de celle des jeux).
-// Les NOMS des types sont traduits dans i18n/locales/*.json (clés « types.grass », « types.fire »…).
 import type { PokemonType } from '../types/pokemon'
 
-// `Record<PokemonType, …>` : TypeScript exige une entrée pour CHACUN des 18 types, ni plus ni moins.
 const COLORS: Record<PokemonType, string> = {
   normal: '#a8a878',
   fire: '#f08030',

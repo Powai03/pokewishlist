@@ -1,21 +1,9 @@
 #!/usr/bin/env bash
-# Version STATIQUE (SSG) du site : bucket S3 + CDN CloudFront, déployée par le pipeline (job « Deploy SSG »).
-# À lancer UNE fois, après infra/aws-setup.sh (qui crée le rôle de déploiement GitHub), depuis la racine du dépôt :
-#
-#   bash infra/aws-ssg-setup.sh
-#
-# Idempotent : relançable sans risque. Crée (moindre privilège) :
-#   1. un bucket S3 PRIVÉ (aucun accès public direct) ;
-#   2. un « Origin Access Control » : seul CloudFront peut lire le bucket ;
-#   3. une CloudFront Function : /pokemon/snivy → /pokemon/snivy/index.html (S3 ne connaît pas les dossiers) ;
-#   4. la distribution CloudFront (HTTPS, cache, page 404 de Nuxt) ;
-#   5. la politique du bucket : lecture autorisée à CETTE distribution seulement ;
-#   6. les droits du rôle de déploiement GitHub : écrire dans CE bucket, invalider le cache de CETTE distribution.
 set -euo pipefail
 
 REGION="${AWS_REGION:-eu-west-1}"
 PROJECT="pokewishlist"
-DEPLOY_ROLE="${PROJECT}-api-github-deploy" # créé par infra/aws-setup.sh
+DEPLOY_ROLE="${PROJECT}-api-github-deploy"
 NAME="${PROJECT}-ssg"
 export AWS_REGION="$REGION" AWS_PAGER=""
 step() { printf '\n[%s/6] %s\n' "$1" "$2"; }
@@ -25,7 +13,7 @@ none() { [ -z "$1" ] || [ "$1" = "None" ]; }
 cd "$(dirname "$0")/.."
 TMP=$(mktemp -d) && trap 'rm -rf "$TMP"' EXIT
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-BUCKET="${NAME}-${ACCOUNT_ID}" # nom unique au monde
+BUCKET="${NAME}-${ACCOUNT_ID}"
 
 step 1 "Bucket S3 privé ($BUCKET)"
 if exists aws s3api head-bucket --bucket "$BUCKET"; then
@@ -87,7 +75,6 @@ step 4 "Distribution CloudFront"
 DIST_ID=$(aws cloudfront list-distributions \
   --query "DistributionList.Items[?Comment=='$NAME'].Id | [0]" --output text)
 if none "$DIST_ID"; then
-  # CachingOptimized : politique de cache gérée par AWS (cache long ; le CD invalide après chaque envoi).
   node -e '
     const [bucket, region, oac, fn, name] = process.argv.slice(1)
     const origin = `${bucket}.s3.${region}.amazonaws.com`

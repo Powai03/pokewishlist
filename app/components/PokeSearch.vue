@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { WISHLIST_MAX } from '~/utils/wishlist'
 import type { Pokemon, SpeciesEntry } from '~/types/pokemon'
 
 const props = defineProps<{ owned: number[]; full: boolean }>()
@@ -10,7 +11,6 @@ const query = ref<string>('')
 const pendingId = ref<number | null>(null)
 const error = ref<string>('')
 
-// L'index des 156 Pokémon d'Unys (avec leurs noms français) est chargé une fois, au montage.
 onMounted(async (): Promise<void> => {
   try {
     index.value = await fetchGen5Index()
@@ -29,7 +29,6 @@ const noResult = computed<boolean>(
     results.value.length === 0,
 )
 const { t, locale } = useI18n()
-/** Nom affiché dans la langue choisie (nom français en français, anglais sinon). */
 const label = (e: SpeciesEntry): string => pokemonName(e, locale.value)
 
 async function add(entry: SpeciesEntry): Promise<void> {
@@ -154,7 +153,6 @@ function addFirst(): void {
   color: #ff8a78;
 }
 
-/* Liste du Pokédex : lignes arrondies, le curseur ▶ apparaît sur la ligne survolée */
 .dex-list {
   list-style: none;
   margin: 10px 0 0;

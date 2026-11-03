@@ -4,10 +4,8 @@ import { createApp } from '../src/app.js'
 import type { ErrorResponse } from '../src/routes/wishlist.js'
 import { WISHLIST_MAX, type WishlistItem } from '../src/wishlist-store.js'
 
-// ── Outils ────────────────────────────────────────────────────────────────────
 let app: Hono
 
-// Une application NEUVE avant chaque test : wishlist vide, aucun test n'influence le suivant.
 beforeEach(() => {
   app = createApp({ version: '0.0.0-test', env: 'test' })
 })
@@ -15,7 +13,6 @@ beforeEach(() => {
 const vipelierre = { id: 495, name: 'Vipélierre' }
 const gruikui = { id: 498, name: 'Gruikui' }
 
-/** Envoie POST /wishlist avec un corps JSON (ou un texte brut, pour tester le JSON invalide). */
 function post(body: unknown, raw?: string): Promise<Response> | Response {
   return app.request('/wishlist', {
     method: 'POST',
@@ -32,7 +29,6 @@ async function list(): Promise<WishlistItem[]> {
   return (await (await app.request('/wishlist')).json()) as WishlistItem[]
 }
 
-// ── GET /wishlist ─────────────────────────────────────────────────────────────
 describe('GET /wishlist', () => {
   it('200 + liste vide au départ', async () => {
     const res = await app.request('/wishlist')
@@ -52,7 +48,6 @@ describe('GET /wishlist', () => {
   })
 })
 
-// ── POST /wishlist ────────────────────────────────────────────────────────────
 describe('POST /wishlist', () => {
   it('201 + le Pokémon créé, non capturé, avec sa date d’ajout', async () => {
     const res = await post(vipelierre)
@@ -92,7 +87,7 @@ describe('POST /wishlist', () => {
       const res = await post(body)
       expect(res.status).toBe(400)
       expect(((await res.json()) as ErrorResponse).error).toBeTypeOf('string')
-      expect(await list()).toEqual([]) // rien n'a été ajouté
+      expect(await list()).toEqual([])
     })
 
     it('JSON invalide → 400 (pas de plantage 500)', async () => {
@@ -134,7 +129,6 @@ describe('POST /wishlist', () => {
   })
 })
 
-// ── DELETE /wishlist/:id ──────────────────────────────────────────────────────
 describe('DELETE /wishlist/:id', () => {
   it('200 + le Pokémon retiré', async () => {
     await post(vipelierre)
@@ -178,7 +172,6 @@ describe('DELETE /wishlist/:id', () => {
   })
 })
 
-// ── Routes inconnues et isolation ─────────────────────────────────────────────
 describe('autres cas', () => {
   it('route inconnue → 404', async () => {
     expect((await app.request('/wishlists')).status).toBe(404)
@@ -197,7 +190,6 @@ describe('autres cas', () => {
   })
 })
 
-// ── POST : champs complets envoyés par le front ───────────────────────────────
 describe('POST /wishlist : données complètes du Pokémon', () => {
   const complet = {
     id: 644,
@@ -235,7 +227,6 @@ describe('POST /wishlist : données complètes du Pokémon', () => {
   })
 })
 
-// ── PATCH /wishlist/:id ───────────────────────────────────────────────────────
 describe('PATCH /wishlist/:id', () => {
   function patch(
     id: string | number,
@@ -282,7 +273,6 @@ describe('PATCH /wishlist/:id', () => {
   })
 })
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
 describe('CORS', () => {
   const corsApp = createApp({
     version: '0.0.0-test',
@@ -320,7 +310,6 @@ describe('CORS', () => {
   })
 })
 
-// ── Likes des fiches ──────────────────────────────────────────────────────────
 describe('GET / POST /pokemon/:id/likes', () => {
   it('0 au départ, puis +1 à chaque POST', async () => {
     expect(await (await app.request('/pokemon/495/likes')).json()).toEqual({

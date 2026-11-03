@@ -1,4 +1,3 @@
-// Le script de récupération des Pokémon d'Unys et la liste qu'il a produite (pré-rendu des fiches).
 import { describe, expect, it } from 'vitest'
 import gen5 from '../data/gen5-pokemon.json'
 import {
@@ -26,7 +25,7 @@ describe('scripts/fetch-gen5-pokemon.mjs', () => {
       parseGeneration({
         pokemon_species: [
           species(498, 'tepig'),
-          species(25, 'pikachu'), // hors 5e génération : écarté
+          species(25, 'pikachu'),
           species(495, 'snivy'),
         ],
       }),

@@ -6,8 +6,6 @@ import {
   PokemonNotFoundError,
 } from '../app/utils/pokeapi'
 
-// ── Outils de simulation (mock) ───────────────────────────────────────────────
-// Une fausse réponse HTTP, construite avec la classe `Response` standard.
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -15,8 +13,6 @@ function jsonResponse(status: number, body: unknown): Response {
   })
 }
 
-// Remplace `fetch` par un faux qui choisit sa réponse selon l'URL demandée.
-// `vi.fn` enregistre chaque appel : on peut ensuite vérifier QUELLES URL ont été demandées.
 function mockFetch(
   routes: Record<string, () => Response>,
 ): ReturnType<typeof vi.fn> {
@@ -29,7 +25,6 @@ function mockFetch(
   return fake
 }
 
-// Réponse 200 de GET /pokemon/495 (Vipélierre), réduite aux champs utilisés, au format réel de PokéAPI.
 const SNIVY = {
   id: 495,
   name: 'snivy',
@@ -50,7 +45,6 @@ const SNIVY = {
   },
 }
 
-// Réponse 200 de GET /pokemon/644 (Zekrom) : deux types, volontairement dans le désordre.
 const ZEKROM = {
   id: 644,
   name: 'zekrom',
@@ -61,7 +55,6 @@ const ZEKROM = {
   sprites: { front_default: null },
 }
 
-// ── fetchPokemon ──────────────────────────────────────────────────────────────
 describe('fetchPokemon', () => {
   describe('réponse 200', () => {
     it('transforme la réponse de PokéAPI en Pokemon', async () => {
@@ -77,7 +70,7 @@ describe('fetchPokemon', () => {
         id: 495,
         name: 'snivy',
         frName: 'Vipélierre',
-        sprite: 'https://img/bw/animated/495.gif', // le sprite ANIMÉ de Noir et Blanc est préféré
+        sprite: 'https://img/bw/animated/495.gif',
         icon: 'https://img/icons/495.png',
         types: ['grass'],
       })
@@ -178,7 +171,6 @@ describe('fetchPokemon', () => {
   })
 })
 
-// ── fetchGen5Index ────────────────────────────────────────────────────────────
 describe('fetchGen5Index', () => {
   it('réponse 200 de GraphQL : index avec les noms français', async () => {
     mockFetch({
@@ -187,7 +179,7 @@ describe('fetchGen5Index', () => {
           data: {
             species: [
               { id: 495, name: 'snivy', names: [{ name: 'Vipélierre' }] },
-              { id: 25, name: 'pikachu', names: [{ name: 'Pikachu' }] }, // hors 5G : écarté
+              { id: 25, name: 'pikachu', names: [{ name: 'Pikachu' }] },
             ],
           },
         }),
@@ -224,7 +216,6 @@ describe('fetchGen5Index', () => {
   })
 })
 
-// ── Le filet de sécurité lui-même ─────────────────────────────────────────────
 describe('filet de sécurité (test/setup.ts)', () => {
   it('sans mock, tout appel réseau est refusé', async () => {
     await expect(

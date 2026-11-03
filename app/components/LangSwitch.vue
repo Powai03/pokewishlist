@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Sélecteur de langue : change TOUTE l'interface sans recharger la page (les textes sont réactifs).
-// Le choix est mémorisé dans un cookie (app/plugins/locale-cookie.ts) et envoyé à l'API (Accept-Language).
 const { locale, locales, setLocale, t } = useI18n()
 
 async function onChange(event: Event): Promise<void> {

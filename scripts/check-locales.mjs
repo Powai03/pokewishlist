@@ -1,17 +1,4 @@
 #!/usr/bin/env node
-// Vérifie les fichiers de traduction : chaque langue doit avoir EXACTEMENT les clés de en.json (la référence).
-//
-//   node scripts/check-locales.mjs                 → front (i18n/locales) + API (api/src/locales)
-//   node scripts/check-locales.mjs dossier1 …      → seulement ces dossiers
-//
-// Pour chaque fichier, signale :
-//   · une clé MANQUANTE (le site afficherait la clé brute, ex. « sheet.weight ») ;
-//   · une clé EN TROP (faute de frappe, ou clé oubliée dans en.json) ;
-//   · un texte vide, ou une valeur qui n'est pas un texte ;
-//   · des variables différentes de l'anglais (« {name} » oublié ou mal orthographié).
-// Code de sortie : 0 si tout est bon, 1 sinon → l'étape de CI GitHub Actions passe au rouge.
-//
-// Aucune dépendance : seulement Node.js (fs, path). En CI, pas besoin de `npm ci`.
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -19,13 +6,6 @@ import { pathToFileURL } from 'node:url'
 const DEFAULT_DIRS = ['i18n/locales', 'api/src/locales']
 const REFERENCE = 'en.json'
 
-/**
- * Aplatit un objet de traduction : { app: { title: 'x' } } → Map { 'app.title' → 'x' }.
- * @param {unknown} value
- * @param {string} [prefix]
- * @param {Map<string, unknown>} [out]
- * @returns {Map<string, unknown>}
- */
 export function flatten(value, prefix = '', out = new Map()) {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
     for (const [key, child] of Object.entries(value)) {
@@ -37,21 +17,10 @@ export function flatten(value, prefix = '', out = new Map()) {
   return out
 }
 
-/**
- * Les variables d'un message, triées : « Hello {name}, {max} » → ['max', 'name'].
- * @param {string} text
- * @returns {string[]}
- */
 export function placeholders(text) {
   return [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort()
 }
 
-/**
- * Compare une traduction à la référence (anglais) ; renvoie la liste des problèmes (vide = OK).
- * @param {unknown} reference contenu de en.json
- * @param {unknown} target contenu de l'autre langue
- * @returns {string[]}
- */
 export function compareLocales(reference, target) {
   const ref = flatten(reference)
   const tgt = flatten(target)
@@ -84,7 +53,6 @@ export function compareLocales(reference, target) {
   return problems
 }
 
-/** Lit un fichier JSON ; renvoie { data } ou { error }. */
 function readJson(file) {
   try {
     return { data: JSON.parse(readFileSync(file, 'utf8')) }
@@ -93,18 +61,11 @@ function readJson(file) {
   }
 }
 
-/**
- * Vérifie un ou plusieurs dossiers de traductions, en affichant la progression.
- * @param {string[]} dirs
- * @param {(line: string) => void} [print]
- * @returns {number} nombre de problèmes trouvés
- */
 export function checkDirs(
   dirs,
   print = (line) => process.stdout.write(`${line}\n`),
 ) {
   const inCi = process.env.GITHUB_ACTIONS === 'true'
-  // Liste des fichiers à comparer (toutes les langues sauf la référence), pour afficher « [i/total] ».
   const jobs = []
   let total = 0
   for (const dir of dirs) {
@@ -122,7 +83,7 @@ export function checkDirs(
 
   print(`Traductions : ${jobs.length} fichier(s) comparé(s) à ${REFERENCE}`)
   jobs.forEach(({ refFile, file }, i) => {
-    const path = relative(process.cwd(), file) // chemin relatif au dépôt (attendu par GitHub)
+    const path = relative(process.cwd(), file)
     const step = `[${i + 1}/${jobs.length}] ${path}`
     const ref = readJson(refFile)
     const tgt = readJson(file)
@@ -138,7 +99,6 @@ export function checkDirs(
     print(`${step} ✘ ${problems.length} problème(s)`)
     for (const problem of problems) {
       print(`    · ${problem}`)
-      // Annotation GitHub Actions : le problème s'affiche sur le fichier, dans l'onglet « Files changed » de la PR.
       if (inCi) print(`::error file=${path},title=Traduction::${problem}`)
     }
     total += problems.length
@@ -151,7 +111,6 @@ export function checkDirs(
   return total
 }
 
-// Exécuté directement (node scripts/check-locales.mjs) — et pas importé par un test.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const args = process.argv.slice(2)
   process.exitCode = checkDirs(args.length ? args : DEFAULT_DIRS) === 0 ? 0 : 1

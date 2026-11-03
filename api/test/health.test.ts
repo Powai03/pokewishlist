@@ -71,7 +71,7 @@ describe('configuration', () => {
     ['test', 'test'],
     ['development', 'development'],
     [undefined, 'development'],
-    ['prod', 'development'], // faute de frappe : jamais considérée comme « production »
+    ['prod', 'development'],
   ])('NODE_ENV=%s → env « %s »', (value, expected) => {
     expect(parseEnv(value)).toBe(expected)
   })

@@ -1,28 +1,8 @@
-// Client HTTP de l'API Hono (dossier api/) : la wishlist est désormais stockée côté serveur.
-//
-//   GET    /wishlist       → la liste
-//   POST   /wishlist       → ajoute un Pokémon
-//   PATCH  /wishlist/:id   → change l'état « capturé »
-//   DELETE /wishlist/:id   → retire un Pokémon
-//
-// L'adresse de l'API (`baseUrl`) est passée en paramètre : l'appli lui donne celle de la configuration
-// (NUXT_PUBLIC_API_BASE), les tests une adresse factice avec un `fetch` simulé.
-//
-// Langue : chaque appel envoie l'en-tête HTTP standard `Accept-Language` (« fr », « ja »…) ;
-// l'API répond alors ses messages d'erreur dans cette langue.
 import type { Pokemon, WishlistItem } from '../types/pokemon'
 import { addPokemon, isPokemonType } from './wishlist'
 
-/**
- * Pourquoi l'appel a échoué, quand le message ne vient PAS de l'API (le front doit alors le traduire lui-même) :
- * · 'unreachable' : l'API ne répond pas (réseau, serveur arrêté) ;
- * · 'unexpected'  : réponse illisible ;
- * · 'status'      : erreur HTTP sans message de l'API.
- * Absent (`undefined`) : le message vient de l'API, déjà traduit par elle.
- */
 export type ApiErrorCode = 'unreachable' | 'unexpected' | 'status'
 
-/** Erreur d'appel à l'API ; `status` vaut 0 quand l'API est injoignable (réseau, serveur arrêté). */
 export class WishlistApiError extends Error {
   constructor(
     public readonly status: number,
@@ -34,7 +14,6 @@ export class WishlistApiError extends Error {
   }
 }
 
-/** Appelle l'API et renvoie le JSON de la réponse (en `unknown` : il sera vérifié ensuite). */
 async function request(
   baseUrl: string,
   path: string,
@@ -56,7 +35,6 @@ async function request(
       'unreachable',
     )
   }
-  // `fetch` ne lève pas d'erreur sur un 4xx/5xx : on lit le message renvoyé par l'API ({ error }).
   const body: unknown = await res.json().catch(() => null)
   if (!res.ok) {
     if (
@@ -77,7 +55,6 @@ const jsonInit = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 })
 
-/** Un élément renvoyé par l'API, vérifié champ par champ (ou `null` s'il est inutilisable). */
 export function parseWishlistItem(data: unknown): WishlistItem | null {
   if (typeof data !== 'object' || data === null) return null
   const p = data as Partial<Record<keyof WishlistItem, unknown>>
@@ -93,10 +70,6 @@ export function parseWishlistItem(data: unknown): WishlistItem | null {
   }
 }
 
-/**
- * La liste renvoyée par l'API, SANS lui faire une confiance aveugle :
- * pas un tableau → liste vide ; entrées invalides, hors 5e génération, doublons ou au-delà de 6 → écartées.
- */
 export function parseWishlistItems(data: unknown): WishlistItem[] {
   if (!Array.isArray(data)) return []
   let list: WishlistItem[] = []
@@ -119,7 +92,6 @@ function expectItem(data: unknown): WishlistItem {
   return item
 }
 
-/** GET /wishlist */
 export async function fetchWishlist(
   baseUrl: string,
   lang?: string,
@@ -127,7 +99,6 @@ export async function fetchWishlist(
   return parseWishlistItems(await request(baseUrl, '/wishlist', {}, lang))
 }
 
-/** POST /wishlist : envoie le Pokémon (données PokéAPI) ; renvoie l'élément créé par l'API. */
 export async function postWishlistItem(
   baseUrl: string,
   pokemon: Pokemon,
@@ -144,7 +115,6 @@ export async function postWishlistItem(
   )
 }
 
-/** PATCH /wishlist/:id : marque le Pokémon capturé (ou non) ; renvoie l'élément modifié. */
 export async function patchCaptured(
   baseUrl: string,
   id: number,
@@ -161,7 +131,6 @@ export async function patchCaptured(
   )
 }
 
-/** DELETE /wishlist/:id */
 export async function deleteWishlistItem(
   baseUrl: string,
   id: number,
@@ -170,7 +139,6 @@ export async function deleteWishlistItem(
   await request(baseUrl, `/wishlist/${id}`, { method: 'DELETE' }, lang)
 }
 
-/** Likes d'une fiche : `{ id, likes }`. */
 function parseLikes(data: unknown): number {
   const likes = (data as { likes?: unknown } | null)?.likes
   if (typeof likes !== 'number') {
@@ -183,7 +151,6 @@ function parseLikes(data: unknown): number {
   return likes
 }
 
-/** GET /pokemon/:id/likes : nombre de likes de la fiche. */
 export async function fetchLikes(
   baseUrl: string,
   id: number,
@@ -192,7 +159,6 @@ export async function fetchLikes(
   return parseLikes(await request(baseUrl, `/pokemon/${id}/likes`, {}, lang))
 }
 
-/** POST /pokemon/:id/likes : un like de plus ; renvoie le nouveau total. */
 export async function postLike(
   baseUrl: string,
   id: number,

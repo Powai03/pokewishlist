@@ -2,7 +2,6 @@
 import type { WishlistItem, WishlistStats } from '~/types/pokemon'
 import { formatDexNumber } from '~/utils/format'
 
-// Écran du haut de la « DS » : une scène de combat façon Pokémon Noir et Blanc.
 const props = defineProps<{
   pokemon: WishlistItem | null
   stats: WishlistStats
@@ -10,7 +9,6 @@ const props = defineProps<{
 
 const { t, locale } = useI18n()
 
-/** Nom du Pokémon dans la langue affichée. */
 const name = computed<string>(() =>
   props.pokemon ? pokemonName(props.pokemon, locale.value) : '',
 )
@@ -23,7 +21,6 @@ const message = computed<string>(() => {
     : t('scene.wild', { name: name.value })
 })
 
-// Couleur de la barre comme une barre de PV : vert, puis jaune, puis rouge.
 type BarClass = 'bar-high' | 'bar-mid' | 'bar-low'
 const barClass = computed<BarClass>(() =>
   props.stats.percent > 50
@@ -37,13 +34,11 @@ const barClass = computed<BarClass>(() =>
 <template>
   <section class="scene" :aria-label="t('scene.label')" data-testid="scene">
     <div class="stage">
-      <!-- Décor : ciel, horizon, herbe et les deux plateformes du combat -->
       <div class="scene-bg" aria-hidden="true">
         <span class="platform platform-far" />
         <span class="platform platform-near" />
       </div>
 
-      <!-- Encadré du Pokémon adverse (en haut à gauche, comme dans le jeu) -->
       <div v-if="pokemon" class="foe-box">
         <div class="foe-line">
           <span class="foe-name">{{ name }}</span>
@@ -67,7 +62,6 @@ const barClass = computed<BarClass>(() =>
         />
       </div>
 
-      <!-- Le Pokémon, posé sur la plateforme du fond -->
       <Transition name="appear" mode="out-in">
         <img
           v-if="pokemon?.sprite"
@@ -79,7 +73,6 @@ const barClass = computed<BarClass>(() =>
         />
       </Transition>
 
-      <!-- Encadré du dresseur (en bas à droite) : la progression de la chasse façon barre de PV -->
       <div class="player-box">
         <div class="foe-line">
           <span class="foe-name">{{ t('scene.hunt') }}</span>
@@ -105,7 +98,6 @@ const barClass = computed<BarClass>(() =>
         </div>
       </div>
 
-      <!-- Boîte de texte du combat -->
       <p class="battle-text" aria-live="polite">
         {{ message }}
         <span class="battle-arrow" aria-hidden="true">▼</span>
@@ -116,7 +108,7 @@ const barClass = computed<BarClass>(() =>
 
 <style scoped>
 .scene {
-  container-type: inline-size; /* les tailles en « cqw » de l'intérieur suivent la largeur de l'écran */
+  container-type: inline-size;
 }
 .stage {
   position: relative;
@@ -126,7 +118,6 @@ const barClass = computed<BarClass>(() =>
   color: #fff;
 }
 
-/* Ciel clair, horizon, puis l'herbe d'Unys */
 .scene-bg {
   position: absolute;
   inset: 0;
@@ -171,7 +162,6 @@ const barClass = computed<BarClass>(() =>
   box-shadow: 0 0.8cqw 0 #5b8f3a;
 }
 
-/* Le Pokémon : sprite pixel agrandi sans flou */
 .foe-sprite {
   position: absolute;
   left: 72%;
@@ -202,7 +192,6 @@ const barClass = computed<BarClass>(() =>
   opacity: 0;
 }
 
-/* Encadrés gris foncé à liseré clair, comme les boîtes de PV de Noir et Blanc */
 .foe-box,
 .player-box {
   position: absolute;
@@ -304,14 +293,12 @@ const barClass = computed<BarClass>(() =>
   background: linear-gradient(#f85838 0 40%, #a84048 40%);
 }
 
-/* Boîte de texte : bandeau sombre semi-transparent en bas de l'écran, comme en combat */
 .battle-text {
   position: absolute;
   left: 1.6cqw;
   right: 1.6cqw;
   bottom: 1.6cqw;
   margin: 0;
-  /* hauteur fixe de 2 lignes : la boîte ne grandit jamais par-dessus l'encadré « Chasse » */
   height: calc(2 * 1.35em + 5.8cqw);
   font-size: 0.86em;
   padding: 2.4cqw 7cqw 2.4cqw 3.4cqw;

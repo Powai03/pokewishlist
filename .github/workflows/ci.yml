@@ -1,34 +1,17 @@
 name: CI/CD
 
-# Un seul pipeline, en étapes reliées par `needs:` (GitHub les dessine en graphe dans l'onglet Actions) :
-#
-#   i18n ───────────┬──────────────────────────────────────────────┐
-#   API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬─▶ API · Build + /health ─┐
-#                   └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E
-#   Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘
-#
-#   puis, sur main uniquement :  E2E ─▶ Migrate DB ─▶ Deploy (deploy.yml) : Deploy API ─┬─▶ Deploy (Vercel, SSR)
-#                                                                                     └─▶ Deploy SSG (S3 + CloudFront)
-#
-# · Un job ne démarre que si ceux dont il dépend ont RÉUSSI : un check rouge arrête la suite.
-# · Les déploiements ne tournent que sur un push dans main (donc après un merge), jamais pour une PR.
 on:
   push:
   pull_request:
 
-# Une PR repoussée annule son exécution précédente. Sur main, jamais : on n'interrompt pas un déploiement.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-# Droits minimaux par défaut (lecture du code) ; le déploiement AWS demande en plus son jeton OIDC.
 permissions:
   contents: read
 
 jobs:
-  # ── Étape 1 : installer une fois, mettre en cache ─────────────────────────────────────────────
-  # node_modules est mis en cache (clé = package-lock.json) ; les jobs suivants le récupèrent
-  # au lieu de relancer `npm ci` chacun de leur côté.
   install:
     name: Install
     runs-on: ubuntu-latest
@@ -64,8 +47,6 @@ jobs:
         run: npm ci
         working-directory: api
 
-  # Traductions : chaque fichier de langue (front i18n/locales, API api/src/locales) doit avoir
-  # exactement les clés de en.json. Aucune dépendance : Node seul, quelques secondes.
   locales:
     name: i18n (clés des locales)
     runs-on: ubuntu-latest
@@ -77,13 +58,12 @@ jobs:
       - name: node scripts/check-locales.mjs (npm run check:locales)
         run: node scripts/check-locales.mjs
 
-  # ── Étape 2 : contrôles de qualité, en parallèle (un check par outil) ─────────────────────────
   check:
     name: ${{ matrix.name }}
     needs: install
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # un check rouge n'arrête pas les autres
+      fail-fast: false
       matrix:
         include:
           - name: Format (Prettier)
@@ -93,7 +73,7 @@ jobs:
           - name: Typecheck
             script: typecheck
           - name: Tests (Vitest)
-            script: test
+            script: test:coverage
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/node-modules
@@ -101,6 +81,15 @@ jobs:
           nuxt-prepare: 'true'
       - name: npm run ${{ matrix.script }}
         run: npm run ${{ matrix.script }}
+      - name: Résumé de la couverture
+        if: matrix.script == 'test:coverage'
+        run: node scripts/coverage-summary.mjs summary coverage front >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: matrix.script == 'test:coverage'
+        with:
+          name: coverage-front
+          path: coverage/
+          retention-days: 7
 
   api-check:
     name: API · ${{ matrix.name }}
@@ -120,7 +109,7 @@ jobs:
           - name: Typecheck
             script: typecheck
           - name: Tests (Vitest)
-            script: test
+            script: test:coverage
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/node-modules
@@ -128,10 +117,16 @@ jobs:
           dir: api
       - name: npm run ${{ matrix.script }}
         run: npm run ${{ matrix.script }}
+      - name: Résumé de la couverture
+        if: matrix.script == 'test:coverage'
+        run: node ../scripts/coverage-summary.mjs summary coverage API >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: matrix.script == 'test:coverage'
+        with:
+          name: coverage-api
+          path: api/coverage/
+          retention-days: 7
 
-  # Tests d'intégration du stockage sur un VRAI serveur PostgreSQL 17 (même version que Supabase),
-  # lancé à côté du job (« service container ») : base jetable, isolée, détruite à la fin du job.
-  # Le schéma vient de supabase/init.sql ; aucun mock SQL. (En local, ces tests utilisent PGlite.)
   api-db:
     name: API · Tests BDD (Postgres)
     needs: api-install
@@ -143,8 +138,6 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          # Base jetable, joignable seulement depuis ce job : connexion sans mot de passe (« trust »).
-          # Aucun mot de passe dans le dépôt → rien que GitGuardian puisse signaler.
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
@@ -163,7 +156,6 @@ jobs:
       - name: vitest run test/db (npm run test:db)
         run: npm run test:db
 
-  # ── Étape 3 : builds (seulement si les contrôles sont verts) ──────────────────────────────────
   build:
     name: Build
     needs: [check, locales]
@@ -171,11 +163,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/node-modules
-      # Les 156 fiches PRÉ-RENDUES figent au build l'adresse de l'API : on construit donc avec celle de l'API
-      # de test de l'E2E (port 3101). Le déploiement, lui, reconstruit avec l'adresse de production.
       - name: nuxt build pour l'E2E (npm run build:e2e)
         run: npm run build:e2e
-      # Le site compilé est transmis au job E2E (pas de 2e build).
       - uses: actions/upload-artifact@v7
         with:
           name: front-build
@@ -183,8 +172,6 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
-  # Build de l'API, démarrage du vrai serveur compilé et appel de GET /health (smoke test),
-  # puis paquet AWS Lambda construit et appelé sans AWS : il fonctionne AVANT tout déploiement.
   api-build:
     name: API · Build + /health
     needs: [api-check, api-db, locales]
@@ -206,7 +193,6 @@ jobs:
           NODE_ENV: production
           PORT: 3002
         run: |
-          # Le serveur écrit dans server.log et est TOUJOURS arrêté à la fin (succès ou échec).
           node dist/index.js > server.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID; echo "--- journal du serveur"; cat server.log' EXIT
@@ -234,9 +220,6 @@ jobs:
           path: api/dist/
           retention-days: 1
 
-  # ── Étape 4 : test de bout en bout ────────────────────────────────────────────────────────────
-  # Un vrai navigateur pilote le front compilé (job Build), qui parle à la VRAIE API compilée (job API · Build).
-  # Seule PokéAPI est simulée (faux serveur pour le rendu serveur de la fiche).
   e2e:
     name: E2E (Playwright)
     needs: [build, api-build]
@@ -266,8 +249,6 @@ jobs:
       - name: Installer Chromium pour Playwright
         run: npx playwright install --with-deps chromium
 
-      # Les serveurs sont démarrés EXPLICITEMENT (visibles dans Actions), en arrière-plan,
-      # avec leurs journaux dans des fichiers. Playwright les réutilise (reuseExistingServer en CI).
       - name: Démarrer l'API Hono (port 3101)
         working-directory: api
         env:
@@ -276,7 +257,6 @@ jobs:
           CORS_ORIGIN: http://localhost:3100
         run: nohup node dist/index.js > ../api.log 2>&1 &
 
-      # Faux PokéAPI pour la fiche /pokemon/:id, chargée par le serveur Nuxt (SSR) : page.route() ne la voit pas.
       - name: Démarrer le faux PokéAPI (port 3102)
         env:
           PORT: 3102
@@ -320,16 +300,6 @@ jobs:
             test-results/
           retention-days: 7
 
-  # ── Étape 5 : déploiement continu (CD), seulement sur main, quand TOUT ce qui précède est vert ──
-  #
-  # Sécurité AWS : AUCUNE clé d'accès stockée dans GitHub. GitHub prouve son identité à AWS par OIDC
-  # (jeton signé, valable quelques minutes) ; AWS l'échange contre des droits temporaires sur UN rôle,
-  # qui ne peut que mettre à jour le code de CETTE fonction Lambda (voir infra/aws-setup.sh).
-  # DATABASE_URL n'est jamais dans GitHub : elle est dans la configuration de la fonction Lambda.
-  # Migrations de la base (supabase/migrations/NNN_*.sql) AVANT le nouveau code : il peut avoir besoin du
-  # nouveau schéma. Le runner (api/src/migrations.ts) n'applique que ce qui n'est pas encore noté dans
-  # schema_migrations : relancé à chaque merge, il ne refait jamais une migration déjà passée.
-  # Les migrations doivent rester compatibles avec le code ENCORE en ligne (ajouter, pas supprimer).
   migrate:
     name: Migrate DB (Supabase)
     needs: e2e
@@ -341,7 +311,6 @@ jobs:
       group: deploy-production-db
       cancel-in-progress: false
     env:
-      # Secret de l'environnement production (main uniquement), jamais affiché dans les journaux.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     defaults:
       run:
@@ -360,7 +329,6 @@ jobs:
       - name: Appliquer les migrations (npm run migrate)
         run: npm run migrate
 
-  # Déploiement du commit du merge : workflow réutilisable deploy.yml (le même que le retour arrière).
   deploy:
     name: Deploy
     needs: migrate
@@ -370,5 +338,64 @@ jobs:
       sha: ${{ github.sha }}
     secrets: inherit
     permissions:
-      id-token: write # connexion à AWS par OIDC (jobs Deploy API et Deploy SSG)
+      id-token: write
       contents: read
+
+  coverage:
+    name: Publish coverage (rapport + badge)
+    needs: deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.SSG_URL }}/coverage/
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      SSG_BUCKET: ${{ vars.SSG_BUCKET }}
+      SSG_DISTRIBUTION_ID: ${{ vars.SSG_DISTRIBUTION_ID }}
+      SSG_URL: ${{ vars.SSG_URL }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          name: coverage-front
+          path: site/front
+      - uses: actions/download-artifact@v8
+        with:
+          name: coverage-api
+          path: site/api
+      - name: Badges et page d'accueil du rapport
+        run: |
+          node scripts/coverage-summary.mjs badge site/front "couverture front" > site/front-badge.json
+          node scripts/coverage-summary.mjs badge site/api "couverture API" > site/api-badge.json
+          cat site/front-badge.json site/api-badge.json
+          printf '%s\n' '<!doctype html><meta charset="utf-8"><title>Couverture · PokéWishlist</title>' \
+            "<h1>Couverture des tests (commit ${GITHUB_SHA:0:7})</h1>" \
+            '<ul><li><a href="front/">Front (Nuxt)</a></li><li><a href="api/">API (Hono)</a></li></ul>' > site/index.html
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: pokewishlist-coverage-${{ github.run_id }}
+      - name: Publier sur S3 + CloudFront (/coverage/)
+        run: |
+          aws s3 sync site "s3://$SSG_BUCKET/coverage" --delete \
+            --cache-control 'public,max-age=0,must-revalidate' --only-show-errors
+          id=$(aws cloudfront create-invalidation --distribution-id "$SSG_DISTRIBUTION_ID" \
+            --paths '/coverage/*' --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$SSG_DISTRIBUTION_ID" --id "$id"
+      - name: Vérifier en ligne
+        run: |
+          for f in coverage/front-badge.json coverage/api-badge.json coverage/front/ coverage/api/; do
+            code=$(curl --silent --max-time 20 -o /dev/null -w '%{http_code}' "$SSG_URL/$f")
+            echo "$SSG_URL/$f → $code"
+            [ "$code" = 200 ] || { echo "::error::$f → $code"; exit 1; }
+          done

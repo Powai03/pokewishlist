@@ -1,5 +1,3 @@
-// Runner de migrations sur une VRAIE base PostgreSQL (PGlite en local, PostgreSQL 17 en CI).
-// Chaque test a SON journal et SES fichiers de migration (dossier temporaire) : isolé des autres tests.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,7 +15,6 @@ afterAll(async () => {
 })
 
 let n = 0
-/** Un dossier de migrations temporaire + une table de journal et une table de données uniques. */
 function sandbox(): {
   dir: string
   table: string
@@ -45,7 +42,7 @@ describe('runner de migrations', () => {
     const first = await runMigrations(db.sql, { dir: s.dir, table: s.table })
     const second = await runMigrations(db.sql, { dir: s.dir, table: s.table })
     expect(first).toEqual({ applied: ['001'], skipped: [] })
-    expect(second).toEqual({ applied: [], skipped: ['001'] }) // sinon « create table » échouerait
+    expect(second).toEqual({ applied: [], skipped: ['001'] })
     const rows = await db.sql.unsafe(
       `select version, name from public.${s.table}`,
     )
@@ -85,7 +82,7 @@ describe('runner de migrations', () => {
     const [row] = await db.sql.unsafe<{ exists: boolean }[]>(
       `select to_regclass('public.${s.data}') is not null as exists`,
     )
-    expect(row?.exists).toBe(false) // la table créée avant l'erreur a été annulée
+    expect(row?.exists).toBe(false)
     expect(await db.sql.unsafe(`select * from public.${s.table}`)).toEqual([])
     s.cleanup()
   })
@@ -112,14 +109,12 @@ describe('runner de migrations', () => {
 
 describe('likes (table pokemon_likes)', () => {
   it('like → total qui augmente, conservé après une nouvelle exécution des migrations', async () => {
-    // Pas de db.clean() : en CI, la base est partagée avec les autres fichiers de test.
-    // On travaille donc en relatif, sur un Pokémon que les autres tests n'utilisent pas.
     const store = new PostgresWishlistStore(db.url, { ssl: false, max: 1 })
     const before = await store.likes(649)
     expect(await store.like(649)).toBe(before + 1)
     expect(await store.like(649)).toBe(before + 2)
-    expect(await runMigrations(db.sql)).toMatchObject({ applied: [] }) // rien à refaire…
-    expect(await store.likes(649)).toBe(before + 2) // … et les likes sont toujours là
+    expect(await runMigrations(db.sql)).toMatchObject({ applied: [] })
+    expect(await store.likes(649)).toBe(before + 2)
     await store.close()
   })
 })

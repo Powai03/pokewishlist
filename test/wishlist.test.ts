@@ -31,7 +31,7 @@ const make = (
 
 const vipelierre = make(495, 'snivy', 'Vipélierre')
 const gruikui = make(498, 'tepig', 'Gruikui')
-const pikachu = make(25, 'pikachu', 'Pikachu') // 1re génération : doit être refusé
+const pikachu = make(25, 'pikachu', 'Pikachu')
 
 const index: SpeciesEntry[] = [
   { id: 494, name: 'victini', frName: 'Victini' },
@@ -49,8 +49,8 @@ describe('isGen5', () => {
     expect(isGen5(649)).toBe(true)
   })
   it('refuse les autres générations', () => {
-    expect(isGen5(493)).toBe(false) // Arceus, 4e gén.
-    expect(isGen5(650)).toBe(false) // Marisson, 6e gén.
+    expect(isGen5(493)).toBe(false)
+    expect(isGen5(650)).toBe(false)
     expect(isGen5(25)).toBe(false)
   })
 })
@@ -105,8 +105,6 @@ describe('searchSpecies', () => {
     ])
   })
   it("classe le français avant l'anglais, et « commence par » avant « contient »", () => {
-    // « re » : Reshiram (le français commence par « re ») > Symbios (l'anglais « reuniclus » commence)
-    //          > Vipélierre (le français contient « re »)
     expect(searchSpecies(index, 're').map((e) => e.frName)).toEqual([
       'Reshiram',
       'Symbios',
@@ -122,7 +120,6 @@ describe('searchSpecies', () => {
 })
 
 describe('addPokemon', () => {
-  // Une équipe de 6 Pokémon d'Unys, pour remplir la liste.
   const team: WishlistItem[] = [
     make(495, 'snivy', 'Vipélierre'),
     make(498, 'tepig', 'Gruikui'),
@@ -140,7 +137,7 @@ describe('addPokemon', () => {
       expect(list[0]?.frName).toBe('Vipélierre')
     })
     it('le transforme en WishlistItem non capturé par défaut', () => {
-      const pokemon = { ...vipelierre, captured: undefined } // un Pokemon « brut » de l'API
+      const pokemon = { ...vipelierre, captured: undefined }
       expect(addPokemon([], pokemon)[0]?.captured).toBe(false)
     })
     it('garde la liste triée par numéro', () => {

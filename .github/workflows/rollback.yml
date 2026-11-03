@@ -1,16 +1,5 @@
 name: Rollback
 
-# Retour arrière : remettre en ligne une version PRÉCÉDENTE (API Lambda, site SSR Vercel, site SSG CloudFront).
-#
-# Lancement : onglet Actions → Rollback → « Run workflow » (depuis main).
-#   · sans commit : le DERNIER DÉPLOIEMENT STABLE avant la version en ligne, c'est-à-dire la dernière exécution
-#     VERTE du pipeline sur main (un pipeline vert sur main = une version testée ET déployée) ;
-#   · avec un commit : cette version-là (par exemple pour revenir ensuite à la plus récente).
-#
-# Le redéploiement passe par le MÊME workflow que les mises en ligne (deploy.yml), smoke tests compris :
-# le retour arrière est lui-même vérifié en ligne.
-# La base n'est PAS remise en arrière : les migrations ne vont que vers l'avant et restent compatibles avec
-# la version précédente (on ajoute, on ne supprime pas : « expand / contract »).
 on:
   workflow_dispatch:
     inputs:
@@ -21,7 +10,7 @@ on:
 
 permissions:
   contents: read
-  actions: read # lire l'historique des exécutions du pipeline
+  actions: read
 
 concurrency:
   group: rollback
@@ -33,7 +22,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
-      name: production # pour lire API_URL
+      name: production
     outputs:
       sha: ${{ steps.pick.outputs.sha }}
     steps:
@@ -43,17 +32,13 @@ jobs:
           API_URL: ${{ vars.API_URL }}
           WANTED: ${{ inputs.commit }}
         run: |
-          # 1. La version actuellement en ligne : le commit renvoyé par /health.
           current=$(curl --silent --max-time 15 "$API_URL/health" \
             | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{console.log(JSON.parse(d).commit)}catch{console.log("")}})')
           echo "Version en ligne : ${current:-inconnue}"
 
           if [ -n "$WANTED" ]; then
-            # 2a. Version demandée explicitement (SHA court ou complet).
             sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$WANTED" -q .sha)
           else
-            # 2b. Dernier déploiement stable AVANT la version en ligne : exécutions vertes du pipeline sur main,
-            #     de la plus récente à la plus ancienne ; on prend celle qui suit la version en ligne.
             mapfile -t stable < <(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --branch main \
               --event push --status success -L 50 --json headSha -q '.[].headSha')
             echo "Déploiements stables (récent → ancien) :"; printf '  %s\n' "${stable[@]:0:5}"
@@ -61,8 +46,6 @@ jobs:
             for i in "${!stable[@]}"; do
               if [ "${stable[$i]}" = "$current" ]; then sha="${stable[$((i + 1))]:-}"; break; fi
             done
-            # Version en ligne absente de la liste (déjà un retour arrière vers une version plus ancienne) :
-            # on prend le dernier déploiement stable.
             [ -n "$sha" ] || sha="${stable[0]:-}"
           fi
           if [ -z "$sha" ] || [ "$sha" = "$current" ]; then

@@ -1,5 +1,3 @@
-// Tests des traductions du stockage PostgreSQL, sans base : ce sont des fonctions pures.
-// (Le dialogue réel avec Supabase est vérifié à la main : voir README, « Base de données ».)
 import { describe, expect, it } from 'vitest'
 import {
   insertErrorToResult,

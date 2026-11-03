@@ -1,5 +1,7 @@
 # PokéWishlist — IIM A4 · CI/CD
 
+[![Couverture front](https://img.shields.io/endpoint?url=https://d7gp7a220g21z.cloudfront.net/coverage/front-badge.json)](https://d7gp7a220g21z.cloudfront.net/coverage/front/) [![Couverture API](https://img.shields.io/endpoint?url=https://d7gp7a220g21z.cloudfront.net/coverage/api-badge.json)](https://d7gp7a220g21z.cloudfront.net/coverage/api/) [![CI/CD](https://github.com/Powai03/pokewishlist/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Powai03/pokewishlist/actions/workflows/ci.yml)
+
 Correspondance entre les **étapes du cours** (PDF « IIM A4 — CI/CD ») et les **PR** / **exécutions du pipeline** qui les réalisent et les prouvent.
 Pipeline : `.github/workflows/ci.yml` (onglet [Actions](https://github.com/Powai03/pokewishlist/actions)). Sites en ligne : [SSR Vercel](https://pokewishlist-nu.vercel.app) · [SSG CloudFront](https://d7gp7a220g21z.cloudfront.net) · [API AWS](https://r3as2k0zxl.execute-api.eu-west-1.amazonaws.com/health).
 
@@ -45,108 +47,8 @@ Préparation de l'API (entre le TP CI et le TP CD) : Hono [#10](https://github.c
 | 15 · E2E : parcours du navigateur jusqu'à l'API                   | [#25](https://github.com/Powai03/pokewishlist/pull/25)                                                                                                                 | [🔴](https://github.com/Powai03/pokewishlist/actions/runs/41664958121) (timing en CI)                                                                                 | [🟢](https://github.com/Powai03/pokewishlist/actions/runs/41665850666) · [🟢](https://github.com/Powai03/pokewishlist/actions/runs/41686353671) (36 tests)                                      |
 | 16 · Smoke tests : la CD échoue si une URL critique ne répond pas | [#19](https://github.com/Powai03/pokewishlist/pull/19), [#27](https://github.com/Powai03/pokewishlist/pull/27)                                                         | —                                                                                                                                                                     | [🟢](https://github.com/Powai03/pokewishlist/actions/runs/41691067386) : `/health`, page SSR, page SSG, codes 200/404, dans chaque job « Deploy »                                               |
 | 17 · SEO : HTML sans JavaScript (title + contenu)                 | — (vérification)                                                                                                                                                       | —                                                                                                                                                                     | `curl` des fiches SSR et SSG : titre, nom, catégorie, description, statistiques                                                                                                                 |
-| 18 · Rollback : retour à la version précédente                    | PR « rollback »                                                                                                                                                        | —                                                                                                                                                                     | workflow « Rollback » (onglet Actions)                                                                                                                                                          |
-| 19 · Couverture des tests (badge)                                 | à faire                                                                                                                                                                | —                                                                                                                                                                     | —                                                                                                                                                                                               |
-
-# Nuxt Minimal Starter
-
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
-
-## Setup
-
-Make sure to install dependencies:
-
-```bash
-# npm
-npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-## Pipeline GitHub Actions (CI/CD)
-
-Un seul workflow, `.github/workflows/ci.yml`, en étapes reliées par `needs:` (graphe visible dans l'onglet Actions) :
-
-```
-i18n ───────────┬──────────────────────────────────────────────┐
-API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬─▶ API · Build + /health ─┐
-                └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E
-Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘
-
-puis, sur main uniquement :  E2E ─▶ Migrate DB ─▶ Deploy API ─┬─▶ Deploy (Vercel, SSR)
-                                                              └─▶ Deploy SSG (S3 + CloudFront)
-```
-
-Tests de bout en bout en local :
-
-```bash
-npm run build:e2e && npm --prefix api run build && npm run e2e
-```
-
-`build:e2e` construit le site avec l'adresse de l'API de test (port 3101) : les fiches pré-rendues la figent au build. Les parcours (`e2e/parcours.spec.ts`) vont du navigateur jusqu'à l'API : fiche, langues, persistance sur un 2e appareil, likes (2 visiteurs, fiche pré-rendue).
-
-Les jobs « Install » mettent `node_modules` en cache pour les suivants ; le Build transmet le site compilé à l'E2E (artefact). Les déploiements ne tournent que sur un push dans `main`, quand tout le reste est vert.
+| 18 · Rollback : retour à la version précédente                    | [#28](https://github.com/Powai03/pokewishlist/pull/28)                                                                                                                 | —                                                                                                                                                                     | workflow « Rollback » (Actions → Rollback → Run workflow)                                                                                                                                       |
+| 19 · Couverture des tests : rapport + badge                       | branche `feat/coverage`                                                                                                                                                | —                                                                                                                                                                     | badges ci-dessus ; [rapport](https://d7gp7a220g21z.cloudfront.net/coverage/) ; résumé dans chaque exécution (jobs « Tests (Vitest) »)                                                           |
 
 ## API (Hono + TypeScript)
 

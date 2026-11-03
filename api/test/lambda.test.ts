@@ -1,5 +1,3 @@
-// Le point d'entrée AWS Lambda (src/lambda.ts) : la même app Hono, appelée avec un événement
-// « Function URL » (format 2.0) au lieu d'une requête HTTP. Aucun compte AWS nécessaire.
 import { describe, expect, it } from 'vitest'
 import type { HealthResponse } from '../src/app.js'
 import { handler } from '../src/lambda.js'
@@ -10,7 +8,6 @@ interface LambdaResult {
   body: string
 }
 
-/** Événement tel qu'AWS l'envoie pour un appel à l'URL de la fonction. */
 function urlEvent(
   method: string,
   path: string,
