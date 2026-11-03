@@ -11,11 +11,13 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
+    "check:locales": "node scripts/check-locales.mjs",
     "e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@nuxtjs/i18n": "^10.6.0",
     "nuxt": "^4.6.3",
     "vue": "^3.5.44",
     "vue-router": "^5.4.0"

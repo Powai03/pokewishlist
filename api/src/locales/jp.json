@@ -1,0 +1,18 @@
+{
+  "invalidJson": "JSON の本文が不正です",
+  "bodyNotObject": "本文は JSON オブジェクトである必要があります",
+  "idInteger": "「id」は整数である必要があります",
+  "idGen5": "「id」は第5世代のポケモン（{first}〜{last}）である必要があります",
+  "nameRequired": "「name」は空でない文字列である必要があります",
+  "nameTooLong": "「name」は{max}文字以内である必要があります",
+  "frNameInvalid": "「frName」は1〜{max}文字の文字列である必要があります",
+  "urlInvalid": "「{field}」は http(s) の URL または null である必要があります",
+  "typesInvalid": "「types」は2つまでの文字列のリストである必要があります",
+  "capturedInvalid": "「captured」は true または false である必要があります",
+  "duplicate": "ポケモン #{id} はすでにウィッシュリストにあります",
+  "full": "ウィッシュリストがいっぱいです（最大{max}匹）",
+  "notInList": "ポケモン #{id} はウィッシュリストにありません",
+  "rejectedByDb": "データベースがデータを拒否しました（{detail}）",
+  "routeNotFound": "ルートが見つかりません：{path}",
+  "internal": "サーバー内部エラー"
+}

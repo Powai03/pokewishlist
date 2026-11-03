@@ -63,3 +63,37 @@ export interface WishlistStats {
   /** Pourcentage arrondi, de 0 à 100. */
   percent: number
 }
+
+/** Identifiants PokéAPI des 6 statistiques de base, dans l'ordre du jeu. */
+export const STAT_KEYS = [
+  'hp',
+  'attack',
+  'defense',
+  'special-attack',
+  'special-defense',
+  'speed',
+] as const
+export type StatKey = (typeof STAT_KEYS)[number]
+
+/** Une statistique de base (PV, Attaque…), de 1 à 255. Son libellé est traduit (clés « stats.hp »…). */
+export interface PokemonStat {
+  key: StatKey
+  value: number
+}
+
+/** Un texte par langue de l'appli (« en », « fr », « es », « ja ») ; une langue peut manquer. */
+export type LocalizedText = Partial<Record<'en' | 'fr' | 'es' | 'ja', string>>
+
+/** La fiche complète d'un Pokémon (page /pokemon/:id) : le Pokémon + ses informations de Pokédex. */
+export interface PokemonDetails extends Pokemon {
+  /** Nom dans chaque langue fournie par PokéAPI (ex. { en: 'Snivy', fr: 'Vipélierre', ja: 'ツタージャ' }). */
+  names: LocalizedText
+  /** Catégorie dans chaque langue (ex. { fr: 'Pokémon Serpenterbe' }). */
+  genus: LocalizedText
+  /** Texte du Pokédex dans chaque langue (celui de Noir et Blanc de préférence). */
+  description: LocalizedText
+  /** Taille en décimètres et poids en hectogrammes (unités de PokéAPI). */
+  height: number
+  weight: number
+  stats: PokemonStat[]
+}

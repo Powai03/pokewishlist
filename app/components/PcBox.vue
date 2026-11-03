@@ -8,13 +8,16 @@ defineProps<{
   ready: boolean
 }>()
 defineEmits<{ select: [id: number] }>()
+
+const { t, locale } = useI18n()
+const nameOf = (p: WishlistItem): string => pokemonName(p, locale.value)
 </script>
 
 <template>
   <section class="pc" aria-labelledby="pc-title">
     <h2 id="pc-title" class="pc-title">
       <span aria-hidden="true">◀</span>
-      Boîte · À capturer
+      {{ t('box.title') }}
       <span class="pc-count">{{ list.length }}/{{ WISHLIST_MAX }}</span>
       <span aria-hidden="true">▶</span>
     </h2>
@@ -23,7 +26,7 @@ defineEmits<{ select: [id: number] }>()
       <ul
         v-if="ready && list.length"
         class="pc-grid"
-        aria-label="Pokémon à capturer"
+        :aria-label="t('box.list')"
       >
         <li v-for="p in list" :key="p.id" :data-testid="`card-${p.id}`">
           <button
@@ -31,7 +34,9 @@ defineEmits<{ select: [id: number] }>()
             class="pc-cell"
             :class="{ selected: p.id === selectedId, captured: p.captured }"
             :aria-pressed="p.id === selectedId"
-            :aria-label="`${p.frName}${p.captured ? ' (capturé)' : ''}`"
+            :aria-label="
+              p.captured ? t('box.captured', { name: nameOf(p) }) : nameOf(p)
+            "
             @click="$emit('select', p.id)"
           >
             <img
@@ -42,13 +47,13 @@ defineEmits<{ select: [id: number] }>()
               alt=""
               loading="lazy"
             />
-            <span class="pc-name">{{ p.frName }}</span>
+            <span class="pc-name">{{ nameOf(p) }}</span>
             <span v-if="p.captured" class="ball ball-cell" />
           </button>
         </li>
       </ul>
       <p v-else-if="ready" class="pc-empty">
-        Ta boîte est vide. Ajoute un Pokémon depuis le Pokédex !
+        {{ t('box.empty') }}
       </p>
     </div>
   </section>

@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   // Fichiers générés : jamais analysés.
-  { ignores: ['dist/', 'coverage/'] },
+  { ignores: ['dist/', 'dist-lambda/', 'coverage/'] },
 
   // Règles recommandées JavaScript + TypeScript.
   js.configs.recommended,
@@ -21,6 +21,12 @@ export default tseslint.config(
       'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
       'no-debugger': 'error',
     },
+  },
+
+  // Scripts Node.js (build Lambda) : variables globales de Node (process, URL…).
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
   },
 
   // Code de l'API : typage explicite obligatoire des fonctions.

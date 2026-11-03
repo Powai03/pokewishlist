@@ -1,13 +1,17 @@
 import { defineConfig, devices } from '@playwright/test'
 
 // Tests de bout en bout (E2E) « full-stack » : un vrai navigateur pilote le front buildé,
-// qui parle à la VRAIE API Hono buildée. Seule PokéAPI (service externe) est simulée.
+// qui parle à la VRAIE API Hono buildée. Seule PokéAPI (service externe) est simulée :
+//   · dans le navigateur, par page.route() (recherche) ;
+//   · côté serveur Nuxt (fiche /pokemon/:id, rendue en SSR), par un faux serveur PokéAPI (port 3102).
 //
 //   navigateur ──▶ front Nuxt (port 3100) ──fetch──▶ API Hono (port 3101)
+//                        └──── fiche (SSR) ──fetch──▶ faux PokéAPI (port 3102)
 //
 // Ports dédiés, pour ne pas tomber sur un autre serveur local (dev sur 3001/3002).
 export const FRONT_URL = 'http://localhost:3100'
 export const API_URL = 'http://localhost:3101'
+export const POKEAPI_MOCK_URL = 'http://localhost:3102'
 
 export default defineConfig({
   testDir: 'e2e',
@@ -25,6 +29,12 @@ export default defineConfig({
   // En CI, ils sont déjà démarrés par des étapes dédiées du workflow : Playwright les réutilise.
   webServer: [
     {
+      command: 'node e2e/pokeapi-mock.mjs',
+      url: `${POKEAPI_MOCK_URL}/health`,
+      env: { PORT: '3102' },
+      reuseExistingServer: !!process.env.CI,
+    },
+    {
       command: 'node api/dist/index.js',
       url: `${API_URL}/health`,
       env: { PORT: '3101', NODE_ENV: 'test', CORS_ORIGIN: FRONT_URL },
@@ -34,7 +44,11 @@ export default defineConfig({
       command: 'node .output/server/index.mjs',
       url: FRONT_URL,
       // Le front est configuré pour appeler l'API de test (runtimeConfig, sans rebuild).
-      env: { PORT: '3100', NUXT_PUBLIC_API_BASE: API_URL },
+      env: {
+        PORT: '3100',
+        NUXT_PUBLIC_API_BASE: API_URL,
+        NUXT_PUBLIC_POKEAPI_BASE: POKEAPI_MOCK_URL,
+      },
       reuseExistingServer: !!process.env.CI,
     },
   ],

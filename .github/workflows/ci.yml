@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ le job e2e plus bas).
+  # 5 jobs indépendants = 5 « checks » distincts visibles sur la PR (+ traductions, e2e et API plus bas).
   # Chaque check porte le nom de son OUTIL ; `cmd` affiche la commande réellement lancée
   # (celle du script npm correspondant dans package.json).
   check:
@@ -50,6 +50,22 @@ jobs:
       - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
         run: npm run ${{ matrix.script }}
 
+  # Traductions : chaque fichier de langue (front i18n/locales, API api/src/locales) doit avoir
+  # exactement les clés de en.json. Une clé manquante → le script sort en code 1 → check rouge.
+  # Aucune dépendance : pas de `npm ci`, le job dure quelques secondes.
+  locales:
+    name: Traductions (clés vs en.json)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: node scripts/check-locales.mjs (npm run check:locales)
+        run: node scripts/check-locales.mjs
+
   # Test de bout en bout : un vrai navigateur ajoute un Pokémon, rafraîchit, vérifie la liste.
   # Le front buildé parle à la VRAIE API buildée (playwright.config.ts démarre les deux serveurs).
   e2e:
@@ -83,7 +99,7 @@ jobs:
         run: npm run build
         working-directory: api
 
-      # Les deux serveurs sont démarrés EXPLICITEMENT (visibles dans Actions), en arrière-plan,
+      # Les serveurs sont démarrés EXPLICITEMENT (visibles dans Actions), en arrière-plan,
       # avec leurs journaux dans des fichiers. Playwright les réutilise (reuseExistingServer en CI).
       - name: Démarrer l'API Hono (port 3101)
         working-directory: api
@@ -93,16 +109,26 @@ jobs:
           CORS_ORIGIN: http://localhost:3100
         run: nohup node dist/index.js > ../api.log 2>&1 &
 
+      # Faux PokéAPI pour la fiche /pokemon/:id, chargée par le serveur Nuxt (SSR) : page.route() ne la voit pas.
+      - name: Démarrer le faux PokéAPI (port 3102)
+        env:
+          PORT: 3102
+        run: nohup node e2e/pokeapi-mock.mjs > pokeapi-mock.log 2>&1 &
+
       - name: Démarrer le front Nuxt (port 3100)
         env:
           PORT: 3100
           NUXT_PUBLIC_API_BASE: http://localhost:3101
+          NUXT_PUBLIC_POKEAPI_BASE: http://localhost:3102
         run: nohup node .output/server/index.mjs > nuxt.log 2>&1 &
 
-      - name: Attendre que les deux serveurs répondent
+      - name: Attendre que les trois serveurs répondent
         run: |
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
             http://localhost:3101/health
+          echo
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
+            http://localhost:3102/health
           echo
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
             --output /dev/null --write-out "front Nuxt : HTTP %{http_code}\n" http://localhost:3100
@@ -115,6 +141,7 @@ jobs:
         run: |
           echo "─── API Hono (api.log) ───"; cat api.log || true
           echo "─── front Nuxt (nuxt.log) ───"; cat nuxt.log || true
+          echo "─── faux PokéAPI (pokeapi-mock.log) ───"; cat pokeapi-mock.log || true
 
       - name: Rapport Playwright (si échec)
         if: failure()
@@ -165,6 +192,46 @@ jobs:
       - name: ${{ matrix.cmd }} (npm run ${{ matrix.script }})
         run: npm run ${{ matrix.script }}
 
+  # Tests d'intégration du stockage sur un VRAI serveur PostgreSQL 17 (même version que Supabase),
+  # lancé à côté du job (« service container ») : base jetable, isolée, détruite à la fin du job.
+  # Le schéma vient de supabase/init.sql ; aucun mock SQL. (En local, ces tests utilisent PGlite.)
+  api-db:
+    name: API · Vitest sur PostgreSQL 17
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # Base jetable, joignable seulement depuis ce job : connexion sans mot de passe (« trust »).
+          # Aucun mot de passe dans le dépôt → rien que GitGuardian puisse signaler.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Installer les dépendances (npm ci)
+        run: npm ci
+
+      - name: vitest run test/db (npm run test:db)
+        run: npm run test:db
+
   # Build de l'API, puis démarrage du vrai serveur compilé et appel de GET /health (smoke test).
   api-build:
     name: API · Build + smoke test
@@ -206,3 +273,12 @@ jobs:
             if (!ok) { console.error("Réponse /health inattendue :", health); process.exit(1) }
             console.log(`OK : status=${health.status}, version=${health.version}, env=${health.env}`)
           '
+
+      # Le paquet déployé sur AWS Lambda par le workflow CD : construit et appelé ici, sans AWS.
+      # Une CI verte garantit donc que le paquet fonctionne AVANT tout déploiement.
+      - name: Paquet AWS Lambda (npm run build:lambda) + appel du handler
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          npm run build:lambda
+          node scripts/invoke-lambda.mjs "$GIT_COMMIT"

@@ -8,12 +8,19 @@ const props = defineProps<{
   stats: WishlistStats
 }>()
 
+const { t, locale } = useI18n()
+
+/** Nom du Pokémon dans la langue affichée. */
+const name = computed<string>(() =>
+  props.pokemon ? pokemonName(props.pokemon, locale.value) : '',
+)
+
 const message = computed<string>(() => {
   const p = props.pokemon
-  if (!p) return "Les hautes herbes sont calmes… Cherche un Pokémon d'Unys !"
+  if (!p) return t('scene.empty')
   return p.captured
-    ? `Et hop ! ${p.frName} est capturé !`
-    : `Un ${p.frName} sauvage apparaît !`
+    ? t('scene.caught', { name: name.value })
+    : t('scene.wild', { name: name.value })
 })
 
 // Couleur de la barre comme une barre de PV : vert, puis jaune, puis rouge.
@@ -28,7 +35,7 @@ const barClass = computed<BarClass>(() =>
 </script>
 
 <template>
-  <section class="scene" aria-label="Pokémon sélectionné" data-testid="scene">
+  <section class="scene" :aria-label="t('scene.label')" data-testid="scene">
     <div class="stage">
       <!-- Décor : ciel, horizon, herbe et les deux plateformes du combat -->
       <div class="scene-bg" aria-hidden="true">
@@ -39,19 +46,25 @@ const barClass = computed<BarClass>(() =>
       <!-- Encadré du Pokémon adverse (en haut à gauche, comme dans le jeu) -->
       <div v-if="pokemon" class="foe-box">
         <div class="foe-line">
-          <span class="foe-name">{{ pokemon.frName }}</span>
-          <span class="foe-no">N°{{ formatDexNumber(pokemon.id) }}</span>
+          <span class="foe-name">{{ name }}</span>
+          <span class="foe-no">{{
+            t('app.dexNo', { n: formatDexNumber(pokemon.id) })
+          }}</span>
         </div>
         <ul class="foe-types">
           <li
-            v-for="t in pokemon.types"
-            :key="t"
-            :style="{ '--type': typeInfo(t).color }"
+            v-for="type in pokemon.types"
+            :key="type"
+            :style="{ '--type': typeColor(type) }"
           >
-            {{ typeInfo(t).label }}
+            {{ t(`types.${type}`) }}
           </li>
         </ul>
-        <span v-if="pokemon.captured" class="ball ball-foe" title="Capturé" />
+        <span
+          v-if="pokemon.captured"
+          class="ball ball-foe"
+          :title="t('scene.captured')"
+        />
       </div>
 
       <!-- Le Pokémon, posé sur la plateforme du fond -->
@@ -62,14 +75,14 @@ const barClass = computed<BarClass>(() =>
           class="foe-sprite"
           :class="{ captured: pokemon.captured }"
           :src="pokemon.sprite"
-          :alt="pokemon.frName"
+          :alt="name"
         />
       </Transition>
 
       <!-- Encadré du dresseur (en bas à droite) : la progression de la chasse façon barre de PV -->
       <div class="player-box">
         <div class="foe-line">
-          <span class="foe-name">Chasse</span>
+          <span class="foe-name">{{ t('scene.hunt') }}</span>
           <span class="foe-no" data-testid="progress"
             >{{ stats.captured }}/{{ stats.total }}</span
           >
@@ -80,9 +93,9 @@ const barClass = computed<BarClass>(() =>
           :aria-valuenow="stats.percent"
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-label="Progression des captures"
+          :aria-label="t('scene.progress')"
         >
-          <span class="hp-label">PV</span>
+          <span class="hp-label">{{ t('scene.hp') }}</span>
           <span class="hp-track"
             ><span
               class="hp-fill"

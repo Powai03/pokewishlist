@@ -1,5 +1,6 @@
 // Configuration lue au démarrage : version (package.json) et environnement (variables d'environnement).
 import { readFileSync } from 'node:fs'
+import { BUILD_INFO } from './build-info.js'
 
 /** Environnements reconnus ; tout le reste est ramené à « development ». */
 export const ENVIRONMENTS = ['development', 'test', 'production'] as const
@@ -14,6 +15,13 @@ export interface AppConfig {
   port: number
   /** Origines (sites) autorisées à appeler l'API depuis un navigateur, lues dans CORS_ORIGIN. */
   corsOrigins: string[]
+  /** Chaîne de connexion PostgreSQL (DATABASE_URL) ; absente → wishlist en mémoire. */
+  databaseUrl: string | undefined
+  /**
+   * Commit git qui tourne : GIT_COMMIT, sinon celui gravé dans le paquet Lambda, sinon « local ».
+   * Affiché par GET /health : prouve QUEL code est déployé (vérifié par le workflow CD après chaque mise en ligne).
+   */
+  commit: string
 }
 
 /** Origines autorisées par défaut : le front Nuxt en local (ports 3000 et 3001). */
@@ -25,7 +33,12 @@ export const DEFAULT_CORS_ORIGINS = [
 /** Lit la version dans api/package.json (fonctionne depuis src/ avec tsx comme depuis dist/ après build). */
 export function readVersion(): string {
   const url = new URL('../package.json', import.meta.url)
-  const pkg: unknown = JSON.parse(readFileSync(url, 'utf8'))
+  let pkg: unknown
+  try {
+    pkg = JSON.parse(readFileSync(url, 'utf8'))
+  } catch {
+    return '0.0.0' // pas de package.json à côté du code (ex. paquet Lambda sans BUILD_INFO)
+  }
   if (
     typeof pkg === 'object' &&
     pkg !== null &&
@@ -61,9 +74,11 @@ export function parseCorsOrigins(value: string | undefined): string[] {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
-    version: readVersion(),
+    version: BUILD_INFO?.version ?? readVersion(),
     env: parseEnv(env.NODE_ENV),
     port: parsePort(env.PORT),
     corsOrigins: parseCorsOrigins(env.CORS_ORIGIN),
+    databaseUrl: env.DATABASE_URL?.trim() || undefined,
+    commit: env.GIT_COMMIT?.trim() || BUILD_INFO?.commit || 'local',
   }
 }

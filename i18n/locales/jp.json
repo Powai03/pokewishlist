@@ -1,0 +1,109 @@
+{
+  "app": {
+    "subtitle": "イッシュ地方・第5世代",
+    "homeLink": "PokéWishlist、ホーム",
+    "footer": "データ：{pokeapi}・非公式の学生プロジェクト（ポケットモンスター ブラック・ホワイトより）",
+    "language": "言語",
+    "dexNo": "No.{n}"
+  },
+  "home": {
+    "title": "PokéWishlist・イッシュ",
+    "actionsFor": "{name} のアクション",
+    "catch": "つかまえる",
+    "release": "にがす",
+    "remove": "はずす",
+    "removeLabel": "{name} をはずす",
+    "sheet": "ずかん",
+    "sheetLabel": "{name} のずかん"
+  },
+  "scene": {
+    "label": "選択中のポケモン",
+    "empty": "くさむらは しずかだ… イッシュの ポケモンを さがそう！",
+    "wild": "あっ！ やせいの {name} が とびだしてきた！",
+    "caught": "やったー！ {name} を つかまえたぞ！",
+    "hunt": "ほかく",
+    "progress": "ほかくの しんちょく",
+    "hp": "HP",
+    "captured": "ほかくずみ"
+  },
+  "search": {
+    "title": "ずかん・イッシュ",
+    "label": "ポケモンの なまえ または ばんごう（494〜649）",
+    "placeholder": "なまえ または No.（れい：Snivy、495）",
+    "apiDown": "PokéAPI が おうとう しません。しばらくして ページを よみこみなおしてください。",
+    "noResult": "あてはまる イッシュの ポケモンは いません（No.494〜649）。",
+    "full": "ボックスが いっぱいです（{max}/{max}）：ポケモンを はずしてから ついかしてください。",
+    "notFound": "PokéAPI に {name} が みつかりません。",
+    "fetchFailed": "{name} を とりこめませんでした。もういちど ためしてください。",
+    "results": "けんさく けっか",
+    "inBox": "ボックスに いる",
+    "boxFull": "いっぱい",
+    "add": "ついか"
+  },
+  "box": {
+    "title": "ボックス・つかまえたい",
+    "list": "つかまえたい ポケモン",
+    "captured": "{name}（ほかくずみ）",
+    "empty": "ボックスは からっぽ。ずかんから ポケモンを ついかしよう！"
+  },
+  "sheet": {
+    "dex": "イッシュずかん",
+    "sprite": "{name} の スプライト",
+    "types": "タイプ",
+    "height": "たかさ",
+    "weight": "おもさ",
+    "noDescription": "にほんごの せつめいは ありません。",
+    "stats": "しゅぞくち",
+    "total": "ごうけい {total}",
+    "loading": "よみこみちゅう…",
+    "inList": "ウィッシュリストに いる",
+    "full": "ウィッシュリストが いっぱい",
+    "add": "ついか",
+    "back": "もどる",
+    "neighbours": "となりの ポケモン"
+  },
+  "error": {
+    "notFoundTitle": "ポケモンが みつかりません",
+    "pokeapiDownTitle": "PokéAPI が おうとう しません",
+    "genericTitle": "エラー",
+    "grass": "くさむらは からっぽだ…",
+    "notGen5": "No.{id} は イッシュの ポケモンでは ありません（No.{first}〜{last}）。",
+    "invalidName": "「{raw}」は ただしい ポケモンの なまえでは ありません。",
+    "unknownPokemon": "「{raw}」という イッシュの ポケモンは いません。",
+    "pokeapiDown": "いまは ずかんを よみこめません。もういちど ためしてください。",
+    "home": "パソコンに もどる"
+  },
+  "api": {
+    "unreachable": "API が おうとう しません。きどう していますか？",
+    "unexpected": "API から よきしない おうとうが ありました",
+    "status": "API エラー {status}"
+  },
+  "types": {
+    "normal": "ノーマル",
+    "fire": "ほのお",
+    "water": "みず",
+    "grass": "くさ",
+    "electric": "でんき",
+    "ice": "こおり",
+    "fighting": "かくとう",
+    "poison": "どく",
+    "ground": "じめん",
+    "flying": "ひこう",
+    "psychic": "エスパー",
+    "bug": "むし",
+    "rock": "いわ",
+    "ghost": "ゴースト",
+    "dragon": "ドラゴン",
+    "dark": "あく",
+    "steel": "はがね",
+    "fairy": "フェアリー"
+  },
+  "stats": {
+    "hp": "HP",
+    "attack": "こうげき",
+    "defense": "ぼうぎょ",
+    "special-attack": "とくこう",
+    "special-defense": "とくぼう",
+    "speed": "すばやさ"
+  }
+}

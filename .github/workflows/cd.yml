@@ -1,0 +1,123 @@
+name: CD
+
+# Déploiement continu de l'API sur AWS Lambda.
+#
+#   merge dans main ──▶ CI (13 checks) ──verte──▶ CD : build du paquet ──▶ AWS Lambda ──▶ GET /health = ce commit ?
+#                                    └─rouge──▶ rien n'est déployé
+#
+# Déclencheur `workflow_run` : ce workflow démarre quand le workflow « CI » se TERMINE, et seulement
+# s'il a réussi, sur un push dans main (donc après un merge, jamais pour une PR).
+#
+# Sécurité AWS : AUCUNE clé d'accès stockée dans GitHub. GitHub prouve son identité à AWS par OIDC
+# (un jeton signé, valable quelques minutes) ; AWS l'échange contre des droits temporaires sur UN rôle,
+# qui ne peut que mettre à jour le code de CETTE fonction Lambda (voir infra/aws-setup.sh).
+# Le mot de passe de la base (DATABASE_URL) n'est jamais dans GitHub : il est stocké dans la configuration
+# de la fonction Lambda, côté AWS.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Relance manuelle (onglet Actions → CD → Run workflow), limitée à main par la condition du job.
+  workflow_dispatch:
+
+# Par défaut, aucun droit sur le dépôt ; le job demande seulement ce dont il a besoin.
+permissions: {}
+
+# Un seul déploiement à la fois ; un nouveau attend la fin du précédent (pas d'annulation en plein envoi).
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-api:
+    name: Déployer l'API sur AWS Lambda
+    # CI verte + push sur main (merge) ; ou relance manuelle depuis main.
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # Environnement GitHub « production » : porte le secret AWS_ROLE_ARN et les variables ci-dessous,
+    # et n'accepte que la branche main (règle à régler dans Settings → Environments).
+    environment:
+      name: production
+      url: ${{ vars.API_URL }}/health
+    permissions:
+      id-token: write # demander le jeton OIDC à GitHub (connexion à AWS sans clé)
+      contents: read # lire le code
+    env:
+      # Le commit qui a passé la CI (et non le dernier commit de main, qui a pu avancer entre-temps).
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      FUNCTION_NAME: ${{ vars.LAMBDA_FUNCTION_NAME }}
+      API_URL: ${{ vars.API_URL }}
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - name: Vérifier la configuration (variables de l'environnement production)
+        working-directory: .
+        run: |
+          missing=0
+          for name in AWS_REGION FUNCTION_NAME API_URL; do
+            if [ -z "${!name}" ]; then echo "::error::Variable manquante : $name"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Installer les dépendances (npm ci)
+        run: npm ci
+
+      - name: '[1/4] Construire le paquet Lambda (commit ${{ env.DEPLOY_SHA }})'
+        env:
+          GIT_COMMIT: ${{ env.DEPLOY_SHA }}
+        run: |
+          npm run build:lambda
+          node scripts/invoke-lambda.mjs "$GIT_COMMIT"
+          cd dist-lambda && zip -q ../lambda.zip index.mjs && cd ..
+          ls -l lambda.zip
+
+      - name: '[2/4] Se connecter à AWS (OIDC, droits temporaires)'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: pokewishlist-cd-${{ github.run_id }}
+
+      - name: '[3/4] Envoyer le code sur la fonction Lambda'
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://lambda.zip \
+            --query '{Version: Version, LastModified: LastModified, CodeSize: CodeSize}' \
+            --output table
+          # Attendre que la nouvelle version soit active avant de la tester.
+          aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
+
+      - name: '[4/4] Vérifier en ligne : GET /health doit renvoyer ce commit'
+        run: |
+          for i in $(seq 1 10); do
+            body=$(curl --silent --show-error --max-time 15 "$API_URL/health" || true)
+            commit=$(node -e 'try { console.log(JSON.parse(process.argv[1]).commit) } catch { console.log("") }' "$body")
+            echo "[$i/10] /health → commit ${commit:-?}"
+            if [ "$commit" = "$DEPLOY_SHA" ]; then
+              echo "$body"
+              echo "✔ L'API en ligne exécute bien le commit $DEPLOY_SHA"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::L'API en ligne ne renvoie pas le commit déployé ($DEPLOY_SHA). Dernière réponse : $body"
+          exit 1

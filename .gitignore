@@ -6,6 +6,10 @@
 .cache
 dist
 
+# Paquet AWS Lambda de l'API (api/scripts/build-lambda.mjs)
+dist-lambda
+lambda.zip
+
 # Node dependencies
 node_modules
 

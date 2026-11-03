@@ -11,6 +11,7 @@
     "noImplicitOverride": true,
     "verbatimModuleSyntax": true, // impose `import type` pour les imports de types
     "isolatedModules": true,
+    "resolveJsonModule": true, // import des fichiers de traduction (src/locales/*.json)
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "."

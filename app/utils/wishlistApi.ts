@@ -7,14 +7,27 @@
 //
 // L'adresse de l'API (`baseUrl`) est passée en paramètre : l'appli lui donne celle de la configuration
 // (NUXT_PUBLIC_API_BASE), les tests une adresse factice avec un `fetch` simulé.
+//
+// Langue : chaque appel envoie l'en-tête HTTP standard `Accept-Language` (« fr », « ja »…) ;
+// l'API répond alors ses messages d'erreur dans cette langue.
 import type { Pokemon, WishlistItem } from '../types/pokemon'
 import { addPokemon, isPokemonType } from './wishlist'
+
+/**
+ * Pourquoi l'appel a échoué, quand le message ne vient PAS de l'API (le front doit alors le traduire lui-même) :
+ * · 'unreachable' : l'API ne répond pas (réseau, serveur arrêté) ;
+ * · 'unexpected'  : réponse illisible ;
+ * · 'status'      : erreur HTTP sans message de l'API.
+ * Absent (`undefined`) : le message vient de l'API, déjà traduit par elle.
+ */
+export type ApiErrorCode = 'unreachable' | 'unexpected' | 'status'
 
 /** Erreur d'appel à l'API ; `status` vaut 0 quand l'API est injoignable (réseau, serveur arrêté). */
 export class WishlistApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    public readonly code?: ApiErrorCode,
   ) {
     super(message)
     this.name = 'WishlistApiError'
@@ -25,24 +38,35 @@ export class WishlistApiError extends Error {
 async function request(
   baseUrl: string,
   path: string,
-  init?: RequestInit,
+  init: RequestInit = {},
+  lang?: string,
 ): Promise<unknown> {
+  const headers = new Headers(init.headers)
+  if (lang) headers.set('Accept-Language', lang)
   let res: Response
   try {
-    res = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, init)
+    res = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, {
+      ...init,
+      headers,
+    })
   } catch {
-    throw new WishlistApiError(0, "L'API ne répond pas. Est-elle démarrée ?")
+    throw new WishlistApiError(
+      0,
+      'The API is not responding. Is it running?',
+      'unreachable',
+    )
   }
   // `fetch` ne lève pas d'erreur sur un 4xx/5xx : on lit le message renvoyé par l'API ({ error }).
   const body: unknown = await res.json().catch(() => null)
   if (!res.ok) {
-    const message =
+    if (
       typeof body === 'object' &&
       body !== null &&
       typeof (body as { error?: unknown }).error === 'string'
-        ? (body as { error: string }).error
-        : `Erreur ${res.status} de l'API`
-    throw new WishlistApiError(res.status, message)
+    ) {
+      throw new WishlistApiError(res.status, (body as { error: string }).error)
+    }
+    throw new WishlistApiError(res.status, `API error ${res.status}`, 'status')
   }
   return body
 }
@@ -85,19 +109,29 @@ export function parseWishlistItems(data: unknown): WishlistItem[] {
 
 function expectItem(data: unknown): WishlistItem {
   const item = parseWishlistItem(data)
-  if (!item) throw new WishlistApiError(500, "Réponse inattendue de l'API")
+  if (!item) {
+    throw new WishlistApiError(
+      500,
+      'Unexpected response from the API',
+      'unexpected',
+    )
+  }
   return item
 }
 
 /** GET /wishlist */
-export async function fetchWishlist(baseUrl: string): Promise<WishlistItem[]> {
-  return parseWishlistItems(await request(baseUrl, '/wishlist'))
+export async function fetchWishlist(
+  baseUrl: string,
+  lang?: string,
+): Promise<WishlistItem[]> {
+  return parseWishlistItems(await request(baseUrl, '/wishlist', {}, lang))
 }
 
 /** POST /wishlist : envoie le Pokémon (données PokéAPI) ; renvoie l'élément créé par l'API. */
 export async function postWishlistItem(
   baseUrl: string,
   pokemon: Pokemon,
+  lang?: string,
 ): Promise<WishlistItem> {
   const { id, name, frName, sprite, icon, types } = pokemon
   return expectItem(
@@ -105,6 +139,7 @@ export async function postWishlistItem(
       baseUrl,
       '/wishlist',
       jsonInit('POST', { id, name, frName, sprite, icon, types }),
+      lang,
     ),
   )
 }
@@ -114,9 +149,15 @@ export async function patchCaptured(
   baseUrl: string,
   id: number,
   captured: boolean,
+  lang?: string,
 ): Promise<WishlistItem> {
   return expectItem(
-    await request(baseUrl, `/wishlist/${id}`, jsonInit('PATCH', { captured })),
+    await request(
+      baseUrl,
+      `/wishlist/${id}`,
+      jsonInit('PATCH', { captured }),
+      lang,
+    ),
   )
 }
 
@@ -124,6 +165,7 @@ export async function patchCaptured(
 export async function deleteWishlistItem(
   baseUrl: string,
   id: number,
+  lang?: string,
 ): Promise<void> {
-  await request(baseUrl, `/wishlist/${id}`, { method: 'DELETE' })
+  await request(baseUrl, `/wishlist/${id}`, { method: 'DELETE' }, lang)
 }
