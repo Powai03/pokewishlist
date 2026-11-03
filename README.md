@@ -83,6 +83,7 @@ cd api
 npm install
 npm run dev        # http://localhost:3002/health (rechargement automatique)
 npm run test       # tests Vitest
+npm run test:db    # tests sur une vraie base PostgreSQL de test (PGlite en local, TEST_DATABASE_URL en CI)
 npm run lint       # ESLint
 npm run format     # Prettier (corrige) — format:check pour vérifier seulement
 npm run typecheck  # TypeScript
