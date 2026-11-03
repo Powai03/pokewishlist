@@ -25,7 +25,8 @@ export default defineConfig({
     trace: 'retain-on-failure', // enregistre un « film » du test quand il échoue
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  // Démarre les deux serveurs de production (après `npm run build` et `npm --prefix api run build`).
+  // Démarre les serveurs de production (après `npm run build:e2e` et `npm --prefix api run build`).
+  // build:e2e : les fiches pré-rendues figent l'adresse de l'API au build ; elle doit être celle de l'API de test (3101).
   // En CI, ils sont déjà démarrés par des étapes dédiées du workflow : Playwright les réutilise.
   webServer: [
     {

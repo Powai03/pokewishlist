@@ -168,8 +168,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/node-modules
-      - name: nuxt build (npm run build)
-        run: npm run build
+      # Les 156 fiches PRÉ-RENDUES figent au build l'adresse de l'API : on construit donc avec celle de l'API
+      # de test de l'E2E (port 3101). Le déploiement, lui, reconstruit avec l'adresse de production.
+      - name: nuxt build pour l'E2E (npm run build:e2e)
+        run: npm run build:e2e
       # Le site compilé est transmis au job E2E (pas de 2e build).
       - uses: actions/upload-artifact@v7
         with:
