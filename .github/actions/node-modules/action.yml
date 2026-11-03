@@ -1,0 +1,29 @@
+name: Dépendances Node (depuis le cache)
+description: >-
+  Installe Node.js et récupère le node_modules préparé par le job « Install » (ou « API · Install »),
+  au lieu de relancer `npm ci` dans chaque job.
+inputs:
+  dir:
+    description: Dossier du package.json (`.` pour le front, `api` pour l'API)
+    default: .
+  nuxt-prepare:
+    description: Générer les types Nuxt (.nuxt/), nécessaires à ESLint et TypeScript côté front
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+
+    - name: Récupérer node_modules (${{ inputs.dir }}) depuis le cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ inputs.dir }}/node_modules
+        key: node-modules-${{ runner.os }}-node24-${{ inputs.dir }}-${{ hashFiles(format('{0}/package-lock.json', inputs.dir)) }}
+        fail-on-cache-miss: true
+
+    - name: nuxt prepare (types Nuxt)
+      if: inputs.nuxt-prepare == 'true'
+      shell: bash
+      run: npx nuxt prepare

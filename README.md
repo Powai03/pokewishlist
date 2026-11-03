@@ -74,6 +74,19 @@ bun run preview
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
 
+## Pipeline GitHub Actions (CI/CD)
+
+Un seul workflow, `.github/workflows/ci.yml`, en étapes reliées par `needs:` (graphe visible dans l'onglet Actions) :
+
+```
+i18n ───────────┬──────────────────────────────────────────────┐
+API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬─▶ API · Build + /health ─┐
+                └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E ─▶ Deploy API ─▶ Deploy (Vercel)
+Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘     (main uniquement)
+```
+
+Les jobs « Install » mettent `node_modules` en cache pour les suivants ; le Build transmet le site compilé à l'E2E (artefact). Les déploiements ne tournent que sur un push dans `main`, quand tout le reste est vert.
+
 ## API (Hono + TypeScript)
 
 L'API est dans le dossier `api/`, avec ses propres dépendances.
@@ -154,20 +167,20 @@ curl -X DELETE http://localhost:3002/wishlist/495 -H "Accept-Language: fr"
 
 ## Déploiement continu (CD) de l'API sur AWS Lambda
 
-Après chaque merge dans `main`, si **toute la CI est verte**, le workflow `.github/workflows/cd.yml` construit l'API en un seul fichier (`npm --prefix api run build:lambda`), l'envoie sur la fonction Lambda, puis vérifie en ligne, via l'API Gateway, que `GET /health` renvoie le commit déployé, que `GET /wishlist` répond et que le CORS est accepté.
+Après chaque merge dans `main`, si **toute la CI est verte**, les derniers jobs du pipeline `.github/workflows/ci.yml` (« Deploy API », puis « Deploy (Vercel) », qui dépendent de tous les autres par `needs:`) construisent l'API en un seul fichier (`npm --prefix api run build:lambda`), l'envoient sur la fonction Lambda, puis vérifient en ligne, via l'API Gateway, que `GET /health` renvoie le commit déployé, que `GET /wishlist` répond et que le CORS est accepté.
 
 Adresse publique : **API Gateway (HTTP API)** `https://r3as2k0zxl.execute-api.eu-west-1.amazonaws.com` (`/health`, `/wishlist`), limitée à 10 requêtes/s (pics à 20). Supabase y est joint par son pooler en mode transaction (port 6543) ; CORS géré par Hono (`CORS_ORIGIN`).
 
 - Connexion à AWS par **OIDC** : aucune clé AWS dans GitHub, seulement l'identifiant d'un rôle (secret `AWS_ROLE_ARN`) qui ne peut que mettre à jour le code de cette fonction, et seulement depuis l'environnement GitHub `production`.
 - `DATABASE_URL` reste côté AWS (configuration de la fonction), jamais dans GitHub.
 - Mise en place, une seule fois : `bash infra/aws-setup.sh` (AWS CLI connecté), puis créer l'environnement `production` dans GitHub avec les valeurs affichées par le script (`AWS_ROLE_ARN` ; variables `AWS_REGION`, `LAMBDA_FUNCTION_NAME`, `API_URL`).
-- Relance manuelle : onglet **Actions → CD → Run workflow** (depuis `main`).
+- Relance : onglet **Actions → CI/CD → Re-run failed jobs** sur l'exécution de `main`.
 
 ## Déploiement continu du front (Nuxt SSR) sur Vercel
 
 Site en ligne : **https://pokewishlist-nu.vercel.app** (rendu serveur, régions `dub1`).
 
-Après chaque merge dans `main` et une CI verte, le workflow CD déploie d'abord l'API (AWS), puis le front : `vercel build --prod` dans GitHub Actions (preset Nitro `vercel`, adresse de l'API gravée au build), `vercel deploy --prebuilt --prod`, puis vérification que le HTML rendu par le serveur porte le commit déployé (`<meta name="app-commit">`, aussi affiché en bas de page).
+Après chaque merge dans `main` et une CI verte, le pipeline déploie d'abord l'API (AWS), puis le front : `vercel build --prod` dans GitHub Actions (preset Nitro `vercel`, adresse de l'API gravée au build), `vercel deploy --prebuilt --prod`, puis vérification que le HTML rendu par le serveur porte le commit déployé (`<meta name="app-commit">`, aussi affiché en bas de page).
 
 - Le déploiement automatique de Vercel est coupé (`vercel.json` : `git.deploymentEnabled: false`) : seul GitHub Actions déploie, après la CI.
 - Environnement GitHub `production` : secret `VERCEL_TOKEN` ; variables `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `FRONT_URL`.
