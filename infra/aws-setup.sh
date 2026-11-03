@@ -114,6 +114,16 @@ echo "    $API_URL"
 
 step 6 "Rôle de déploiement pour GitHub Actions ($DEPLOY_ROLE)"
 # Qui peut l'endosser : UNIQUEMENT un job de $REPO dans l'environnement GitHub « $GH_ENVIRONMENT ».
+# Le « sub » du jeton GitHub existe sous deux formes : classique (repo:owner/nom:…) et « immuable »
+# (repo:owner@<id>/nom@<id>:…, avec les identifiants numériques fixes du compte et du dépôt, qui ne
+# changent pas si on renomme). On lit celle du dépôt avec `gh` (si disponible) et on accepte les deux.
+SUB_CLASSIC="repo:${REPO}:environment:${GH_ENVIRONMENT}"
+SUB_PREFIX=$(gh api "repos/${REPO}/actions/oidc/customization/sub" -q '.sub_claim_prefix // empty' 2>/dev/null || true)
+SUBS="\"$SUB_CLASSIC\""
+if [ -n "$SUB_PREFIX" ] && [ "$SUB_PREFIX" != "repo:${REPO}" ]; then
+  SUBS="$SUBS, \"${SUB_PREFIX}:environment:${GH_ENVIRONMENT}\""
+fi
+echo "    jetons acceptés (sub) : $SUBS"
 TRUST=$(cat <<EOF
 {
   "Version": "2012-10-17",
@@ -124,7 +134,7 @@ TRUST=$(cat <<EOF
     "Condition": {
       "StringEquals": {
         "${OIDC_HOST}:aud": "sts.amazonaws.com",
-        "${OIDC_HOST}:sub": "repo:${REPO}:environment:${GH_ENVIRONMENT}"
+        "${OIDC_HOST}:sub": [$SUBS]
       }
     }
   }]
