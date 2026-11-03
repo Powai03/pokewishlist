@@ -83,8 +83,38 @@ jobs:
         run: npm run build
         working-directory: api
 
+      # Les deux serveurs sont démarrés EXPLICITEMENT (visibles dans Actions), en arrière-plan,
+      # avec leurs journaux dans des fichiers. Playwright les réutilise (reuseExistingServer en CI).
+      - name: Démarrer l'API Hono (port 3101)
+        working-directory: api
+        env:
+          PORT: 3101
+          NODE_ENV: test
+          CORS_ORIGIN: http://localhost:3100
+        run: nohup node dist/index.js > ../api.log 2>&1 &
+
+      - name: Démarrer le front Nuxt (port 3100)
+        env:
+          PORT: 3100
+          NUXT_PUBLIC_API_BASE: http://localhost:3101
+        run: nohup node .output/server/index.mjs > nuxt.log 2>&1 &
+
+      - name: Attendre que les deux serveurs répondent
+        run: |
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
+            http://localhost:3101/health
+          echo
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
+            --output /dev/null --write-out "front Nuxt : HTTP %{http_code}\n" http://localhost:3100
+
       - name: playwright test (npm run e2e)
         run: npm run e2e
+
+      - name: Journaux des serveurs (si échec)
+        if: failure()
+        run: |
+          echo "─── API Hono (api.log) ───"; cat api.log || true
+          echo "─── front Nuxt (nuxt.log) ───"; cat nuxt.log || true
 
       - name: Rapport Playwright (si échec)
         if: failure()
