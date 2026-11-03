@@ -81,7 +81,7 @@ Un seul workflow, `.github/workflows/ci.yml`, en étapes reliées par `needs:` (
 ```
 i18n ───────────┬──────────────────────────────────────────────┐
 API · Install ──┼─▶ API · Prettier/ESLint/Typecheck/Vitest ──┬─▶ API · Build + /health ─┐
-                └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E ─▶ Deploy API ─▶ Deploy (Vercel)
+                └─▶ API · Tests BDD (Postgres) ──────────────┘                         ├─▶ E2E ─▶ Migrate DB ─▶ Deploy API ─▶ Deploy (Vercel)
 Install ──────────▶ Prettier/ESLint/Typecheck/Vitest ───────────▶ Build ───────────────┘     (main uniquement)
 ```
 
@@ -156,6 +156,8 @@ Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des vir
 ### Migrations SQL
 
 `supabase/init.sql` crée le schéma de départ ; les évolutions sont dans `supabase/migrations/NNN_nom.sql` (ex. `001_likes.sql`). Le runner maison (`api/src/migrations.ts`) les applique dans l'ordre, **une seule fois** chacune, et les note dans la table `schema_migrations` (version, empreinte SHA-256, date) :
+
+Le pipeline les applique automatiquement après chaque merge dans `main` (job **Migrate DB**, avant le déploiement de l'API ; secret `DATABASE_URL` de l'environnement `production`). À la main :
 
 ```bash
 cd api && npm run migrate   # base de DATABASE_URL (api/.env) ; sans risque à relancer
