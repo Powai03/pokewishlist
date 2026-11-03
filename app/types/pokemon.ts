@@ -63,3 +63,24 @@ export interface WishlistStats {
   /** Pourcentage arrondi, de 0 à 100. */
   percent: number
 }
+
+/** Une statistique de base (PV, Attaque…), de 1 à 255. */
+export interface PokemonStat {
+  /** Identifiant PokéAPI : 'hp', 'attack', 'defense', 'special-attack', 'special-defense', 'speed'. */
+  key: string
+  /** Libellé français (« PV », « Attaque »…). */
+  label: string
+  value: number
+}
+
+/** La fiche complète d'un Pokémon (page /pokemon/:id) : le Pokémon + ses informations de Pokédex. */
+export interface PokemonDetails extends Pokemon {
+  /** Catégorie en français (ex. « Pokémon Serpent »), ou `null`. */
+  genus: string | null
+  /** Texte du Pokédex en français, ou `null` s'il n'y en a pas. */
+  description: string | null
+  /** Taille en décimètres et poids en hectogrammes (unités de PokéAPI). */
+  height: number
+  weight: number
+  stats: PokemonStat[]
+}

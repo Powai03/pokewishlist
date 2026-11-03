@@ -130,6 +130,10 @@ Une donnée refusée par une contrainte de la base (ex. type inconnu) renvoie `4
 
 Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des virgules ; défaut : `http://localhost:3000,http://localhost:3001`).
 
+## Fiche d'un Pokémon
+
+`/pokemon/495` ou `/pokemon/snivy` : fiche rendue par le serveur à partir de PokéAPI (nom français, catégorie, types, taille, poids, texte du Pokédex, statistiques). Un Pokémon inconnu ou hors 5e génération renvoie une page **404**. Adresse de PokéAPI : `NUXT_PUBLIC_POKEAPI_BASE` (défaut `https://pokeapi.co/api/v2` ; un faux serveur, `e2e/pokeapi-mock.mjs`, la remplace pendant les tests E2E).
+
 ## Lancer le front avec l'API
 
 Le front lit et enregistre la wishlist via l'API (plus de localStorage). Dans deux terminaux :
