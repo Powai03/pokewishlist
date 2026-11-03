@@ -14,6 +14,8 @@ export interface AppConfig {
   port: number
   /** Origines (sites) autorisées à appeler l'API depuis un navigateur, lues dans CORS_ORIGIN. */
   corsOrigins: string[]
+  /** Chaîne de connexion PostgreSQL (DATABASE_URL) ; absente → wishlist en mémoire. */
+  databaseUrl: string | undefined
 }
 
 /** Origines autorisées par défaut : le front Nuxt en local (ports 3000 et 3001). */
@@ -65,5 +67,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     env: parseEnv(env.NODE_ENV),
     port: parsePort(env.PORT),
     corsOrigins: parseCorsOrigins(env.CORS_ORIGIN),
+    databaseUrl: env.DATABASE_URL?.trim() || undefined,
   }
 }

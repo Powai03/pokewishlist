@@ -29,6 +29,11 @@ describe('GET /health', () => {
     expect(new Date(body.timestamp).toISOString()).toBe(body.timestamp)
   })
 
+  it('indique le stockage utilisé (mémoire par défaut)', async () => {
+    const body = (await (await app.request('/health')).json()) as HealthResponse
+    expect(body.storage).toBe('memory')
+  })
+
   it('route inconnue → 404 en JSON', async () => {
     const res = await app.request('/inconnue')
     expect(res.status).toBe(404)
@@ -71,6 +76,14 @@ describe('configuration', () => {
       env: 'production',
       port: 4000,
     })
+  })
+
+  it('DATABASE_URL absente ou vide → pas de base (stockage en mémoire)', () => {
+    expect(loadConfig({}).databaseUrl).toBeUndefined()
+    expect(loadConfig({ DATABASE_URL: '  ' }).databaseUrl).toBeUndefined()
+    expect(
+      loadConfig({ DATABASE_URL: 'postgresql://u:p@h/db' }).databaseUrl,
+    ).toBe('postgresql://u:p@h/db')
   })
 
   it.each([

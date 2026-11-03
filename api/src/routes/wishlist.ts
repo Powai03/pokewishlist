@@ -19,7 +19,7 @@ export interface ErrorResponse {
 export function wishlistRoutes(store: WishlistStore): Hono {
   const routes = new Hono()
 
-  routes.get('/', (c) => c.json(store.list(), 200))
+  routes.get('/', async (c) => c.json(await store.list(), 200))
 
   routes.post('/', async (c) => {
     // 1. Lire le JSON : un corps illisible est une erreur du client (400), pas un plantage (500).
@@ -34,8 +34,15 @@ export function wishlistRoutes(store: WishlistStore): Hono {
     const input = validateInput(body)
     if (!input.ok) return c.json<ErrorResponse>({ error: input.error }, 400)
 
-    // 3. Ajouter : 409 (conflit) si déjà présent ou si la liste est pleine.
-    const result = store.add(input.value)
+    // 3. Ajouter : 409 (conflit) si déjà présent ou si la liste est pleine ;
+    //    400 si la base refuse une donnée (ex. type inconnu, contrôlé par une contrainte SQL).
+    const result = await store.add(input.value)
+    if (!result.ok && result.reason === 'invalid') {
+      return c.json<ErrorResponse>(
+        { error: `Donnée refusée par la base (${result.detail})` },
+        400,
+      )
+    }
     if (!result.ok) {
       const error =
         result.reason === 'duplicate'
@@ -66,7 +73,7 @@ export function wishlistRoutes(store: WishlistStore): Hono {
     const patch = validatePatch(body)
     if (!patch.ok) return c.json<ErrorResponse>({ error: patch.error }, 400)
 
-    const item = store.setCaptured(id, patch.value.captured)
+    const item = await store.setCaptured(id, patch.value.captured)
     if (!item) {
       return c.json<ErrorResponse>(
         { error: `Le Pokémon #${id} n'est pas dans la wishlist` },
@@ -76,7 +83,7 @@ export function wishlistRoutes(store: WishlistStore): Hono {
     return c.json(item, 200)
   })
 
-  routes.delete('/:id', (c) => {
+  routes.delete('/:id', async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isInteger(id)) {
       return c.json<ErrorResponse>(
@@ -84,7 +91,7 @@ export function wishlistRoutes(store: WishlistStore): Hono {
         400,
       )
     }
-    const removed = store.remove(id)
+    const removed = await store.remove(id)
     if (!removed) {
       return c.json<ErrorResponse>(
         { error: `Le Pokémon #${id} n'est pas dans la wishlist` },

@@ -97,6 +97,7 @@ npm start          # lance dist/index.js
   "status": "ok",
   "version": "0.1.0",
   "env": "production",
+  "storage": "postgres",
   "uptime": 12,
   "timestamp": "…"
 }
@@ -116,7 +117,15 @@ Variables d'environnement : `PORT` (3002 par défaut), `NODE_ENV` (`development`
 
 Corps de `POST /wishlist` : `{ "id": 495, "name": "Vipélierre" }` (5e génération : 494 à 649, 6 Pokémon maximum).
 
-La wishlist est stockée **en mémoire** : elle est vidée à chaque redémarrage de l'API.
+### Base de données (Supabase)
+
+La wishlist est enregistrée dans une base PostgreSQL hébergée par Supabase quand `DATABASE_URL` est définie ; sinon elle reste **en mémoire** (vidée à chaque redémarrage : c'est le cas des tests et de la CI). `GET /health` indique lequel (`"storage": "postgres"` ou `"memory"`).
+
+1. Créer un projet sur supabase.com, puis exécuter `supabase/init.sql` dans **SQL Editor** (table `wishlist`, règles 5G / doublon / 6 maximum, RLS).
+2. Copier `api/.env.example` en `api/.env` et y mettre la chaîne de connexion (**Connect → Direct → Session pooler**).
+3. `npm run dev` lit `api/.env` automatiquement.
+
+Une donnée refusée par une contrainte de la base (ex. type inconnu) renvoie `400`.
 
 Variables de l'API : `CORS_ORIGIN` (origines autorisées, séparées par des virgules ; défaut : `http://localhost:3000,http://localhost:3001`).
 

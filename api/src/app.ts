@@ -4,13 +4,17 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { DEFAULT_CORS_ORIGINS, type AppConfig, type AppEnv } from './config.js'
 import { wishlistRoutes } from './routes/wishlist.js'
-import { WishlistStore } from './wishlist-store.js'
+import { MemoryWishlistStore, type WishlistStore } from './wishlist-store.js'
+
+export type StorageKind = 'memory' | 'postgres'
 
 /** Réponse de GET /health. */
 export interface HealthResponse {
   status: 'ok'
   version: string
   env: AppEnv
+  /** Où la wishlist est rangée : « postgres » (Supabase) ou « memory » (tableau, perdu au redémarrage). */
+  storage: StorageKind
   /** Secondes écoulées depuis le démarrage de l'API. */
   uptime: number
   /** Date et heure de la réponse (ISO 8601). */
@@ -24,7 +28,8 @@ export interface HealthResponse {
 export function createApp(
   config: Pick<AppConfig, 'version' | 'env'> &
     Partial<Pick<AppConfig, 'corsOrigins'>>,
-  store: WishlistStore = new WishlistStore(),
+  store: WishlistStore = new MemoryWishlistStore(),
+  storage: StorageKind = 'memory',
 ): Hono {
   const app = new Hono()
   const startedAt = Date.now()
@@ -48,6 +53,7 @@ export function createApp(
       status: 'ok',
       version: config.version,
       env: config.env,
+      storage,
       uptime: Math.round((Date.now() - startedAt) / 1000),
       timestamp: new Date().toISOString(),
     }
@@ -55,6 +61,12 @@ export function createApp(
   })
 
   app.route('/wishlist', wishlistRoutes(store))
+
+  // Erreur imprévue (ex. base injoignable) : 500 en JSON, sans détail technique pour le client.
+  app.onError((err, c) => {
+    console.error(err)
+    return c.json({ error: 'Erreur interne du serveur' }, 500)
+  })
 
   // Toute autre route : 404 en JSON (plutôt qu'une page texte).
   app.notFound((c) => c.json({ error: 'Not Found', path: c.req.path }, 404))

@@ -1,5 +1,9 @@
-// Stockage de la wishlist EN MÉMOIRE : un simple tableau, sans base de données.
-// Les données sont perdues à chaque redémarrage de l'API (choix assumé pour l'instant).
+// Règles métier de la wishlist + l'interface commune des stockages (`WishlistStore`).
+//
+// Deux stockages respectent cette interface :
+//   · MemoryWishlistStore (ce fichier)  : un tableau en mémoire, pour les tests et la CI ;
+//   · PostgresWishlistStore (postgres-store.ts) : la base Supabase, quand DATABASE_URL est définie.
+// Les routes ne connaissent que l'interface : elles ne savent pas où les données sont rangées.
 //
 // Les règles métier sont les mêmes que côté front (app/utils/wishlist.ts) :
 // 5e génération uniquement, pas de doublon, 6 Pokémon maximum.
@@ -39,7 +43,25 @@ export type Validation<T> =
 
 /** Résultat d'un ajout : l'élément créé, ou la raison du refus. */
 export type AddResult =
-  { ok: true; item: WishlistItem } | { ok: false; reason: 'duplicate' | 'full' }
+  | { ok: true; item: WishlistItem }
+  | { ok: false; reason: 'duplicate' | 'full' }
+  /** Refusé par une contrainte de la base (ex. type inconnu) : `detail` nomme la contrainte. */
+  | { ok: false; reason: 'invalid'; detail: string }
+
+/**
+ * Ce que doit savoir faire un stockage de wishlist. Tout est asynchrone (`Promise`) :
+ * une base de données répond via le réseau, pas instantanément comme un tableau.
+ */
+export interface WishlistStore {
+  /** La liste, triée par numéro. */
+  list(): Promise<WishlistItem[]>
+  /** Ajoute un Pokémon (déjà validé) ; refuse un doublon ou une liste pleine. */
+  add(input: WishlistInput): Promise<AddResult>
+  /** Marque capturé ou non ; `undefined` si le Pokémon n'est pas dans la liste. */
+  setCaptured(id: number, captured: boolean): Promise<WishlistItem | undefined>
+  /** Retire un Pokémon ; renvoie l'élément retiré, ou `undefined` s'il n'était pas là. */
+  remove(id: number): Promise<WishlistItem | undefined>
+}
 
 export function isGen5(id: number): boolean {
   return Number.isInteger(id) && id >= GEN5.first && id <= GEN5.last
@@ -137,42 +159,43 @@ export function validatePatch(
   return { ok: false, error: '« captured » doit être true ou false' }
 }
 
-export class WishlistStore {
+/** Stockage EN MÉMOIRE : un simple tableau, perdu à chaque redémarrage (tests, CI, dev sans base). */
+export class MemoryWishlistStore implements WishlistStore {
   /** Le tableau en mémoire. `private` : on n'y touche que par les méthodes ci-dessous. */
   private items: WishlistItem[] = []
 
-  /** Copie de la liste, triée par numéro (l'appelant ne peut pas modifier le tableau interne). */
-  list(): WishlistItem[] {
-    return [...this.items].sort((a, b) => a.id - b.id)
-  }
-
-  get(id: number): WishlistItem | undefined {
+  private find(id: number): WishlistItem | undefined {
     return this.items.find((item) => item.id === id)
   }
 
-  /** Ajoute un Pokémon (déjà validé) ; refuse un doublon ou une liste pleine. */
-  add(input: WishlistInput, now: Date = new Date()): AddResult {
-    if (this.get(input.id)) return { ok: false, reason: 'duplicate' }
+  /** Copie de la liste, triée par numéro (l'appelant ne peut pas modifier le tableau interne). */
+  async list(): Promise<WishlistItem[]> {
+    return [...this.items].sort((a, b) => a.id - b.id)
+  }
+
+  async add(input: WishlistInput): Promise<AddResult> {
+    if (this.find(input.id)) return { ok: false, reason: 'duplicate' }
     if (this.items.length >= WISHLIST_MAX) return { ok: false, reason: 'full' }
     const item: WishlistItem = {
       ...input,
       captured: false,
-      addedAt: now.toISOString(),
+      addedAt: new Date().toISOString(),
     }
     this.items.push(item)
     return { ok: true, item }
   }
 
-  /** Marque un Pokémon capturé ou non ; renvoie l'élément modifié, ou `undefined` s'il n'est pas là. */
-  setCaptured(id: number, captured: boolean): WishlistItem | undefined {
-    const item = this.get(id)
+  async setCaptured(
+    id: number,
+    captured: boolean,
+  ): Promise<WishlistItem | undefined> {
+    const item = this.find(id)
     if (item) item.captured = captured
     return item
   }
 
-  /** Retire un Pokémon ; renvoie l'élément retiré, ou `undefined` s'il n'était pas là. */
-  remove(id: number): WishlistItem | undefined {
-    const item = this.get(id)
+  async remove(id: number): Promise<WishlistItem | undefined> {
+    const item = this.find(id)
     if (item) this.items = this.items.filter((i) => i.id !== id)
     return item
   }
