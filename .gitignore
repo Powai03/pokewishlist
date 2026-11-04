@@ -1,4 +1,3 @@
-# Nuxt dev/build outputs
 .output
 .data
 .nuxt
@@ -6,35 +5,29 @@
 .cache
 dist
 
-# Paquet AWS Lambda de l'API (api/scripts/build-lambda.mjs)
 dist-lambda
 lambda.zip
 
-# Lien local vers le projet Vercel (identifiants du projet)
 .vercel
 
-# Node dependencies
 node_modules
 
-# Logs
 logs
 *.log
 
-# Misc
 .DS_Store
 .fleet
 .idea
 
-# Local env files
 .env
 .env.*
 !.env.example
 
-# Notes perso (non versionnées)
 /EXPLICATIONS.md
 
-# Playwright
 /test-results/
 /playwright-report/
 /blob-report/
 .env*
+
+coverage

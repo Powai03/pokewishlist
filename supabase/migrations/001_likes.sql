@@ -1,8 +1,3 @@
--- Migration 001 : les « likes » des fiches Pokémon.
--- Appliquée UNE seule fois par le runner (api/src/migrations.ts), notée dans public.schema_migrations.
--- Volontairement SANS « if not exists » : rejouée par erreur, elle échouerait au lieu de passer inaperçue.
-
--- Un compteur par Pokémon d'Unys (pas de ligne = 0 like).
 create table public.pokemon_likes (
   pokemon_id smallint primary key
     constraint pokemon_likes_id_gen5 check (pokemon_id between 494 and 649),
@@ -14,5 +9,4 @@ create table public.pokemon_likes (
 comment on table public.pokemon_likes is 'Nombre de likes de chaque fiche Pokémon (5e génération).';
 comment on column public.pokemon_likes.likes is 'Total des likes, incrémenté de façon atomique par l''API.';
 
--- Même règle que la wishlist : aucun accès par l'API REST publique de Supabase, seulement par le serveur.
 alter table public.pokemon_likes enable row level security;

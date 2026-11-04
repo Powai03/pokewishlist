@@ -1,7 +1,3 @@
-// Stockage de la wishlist dans PostgreSQL (la base Supabase, schéma : supabase/init.sql).
-//
-// Les règles (5G, doublon, 6 max) sont vérifiées PAR LA BASE : on tente l'écriture,
-// et on traduit son éventuel refus (code d'erreur PostgreSQL) en résultat compréhensible par les routes.
 import postgres from 'postgres'
 import type {
   AddResult,
@@ -10,7 +6,6 @@ import type {
   WishlistStore,
 } from './wishlist-store.js'
 
-/** Une ligne de la table `wishlist`, telle que PostgreSQL la renvoie (noms en snake_case). */
 export interface WishlistRow {
   id: number
   name: string
@@ -22,7 +17,6 @@ export interface WishlistRow {
   added_at: Date
 }
 
-/** Ligne SQL → objet JSON de l'API (snake_case → camelCase, date → texte ISO 8601). */
 export function rowToItem(row: WishlistRow): WishlistItem {
   return {
     id: row.id,
@@ -36,17 +30,9 @@ export function rowToItem(row: WishlistRow): WishlistItem {
   }
 }
 
-/** Codes d'erreur PostgreSQL utiles ici (norme SQLSTATE). */
 const UNIQUE_VIOLATION = '23505'
 const CHECK_VIOLATION = '23514'
 
-/**
- * Traduit le refus d'un INSERT par la base en résultat métier, ou `null` si c'est une autre erreur
- * (base injoignable…), qui sera alors remontée telle quelle (→ 500).
- *   · 23505 sur la clé primaire           → doublon
- *   · 23514 sans contrainte nommée        → le déclencheur « 6 maximum »
- *   · 23514 avec une contrainte CHECK     → donnée invalide (ex. type inconnu)
- */
 export function insertErrorToResult(error: unknown): AddResult | null {
   if (typeof error !== 'object' || error === null) return null
   const { code, constraint_name: constraint } = error as {
@@ -62,30 +48,24 @@ export function insertErrorToResult(error: unknown): AddResult | null {
   return null
 }
 
-/** Réglages de connexion ; les valeurs par défaut conviennent à Supabase. */
 export interface PostgresStoreOptions {
-  /** Connexion chiffrée (défaut : true). Désactivée seulement pour une base de test locale. */
   ssl?: boolean
-  /** Nombre maximal de connexions simultanées (défaut : 5). */
   max?: number
-  /** Ferme une connexion inutilisée depuis ce nombre de secondes (défaut : jamais). */
   idleTimeout?: number
-  /** Renouvelle toute connexion plus vieille que ce nombre de secondes (défaut : 30 à 60 min). */
   maxLifetime?: number
 }
 
 export class PostgresWishlistStore implements WishlistStore {
   private readonly sql: postgres.Sql
 
-  /** @param url chaîne de connexion (DATABASE_URL), ex. celle du « Session pooler » de Supabase. */
   constructor(url: string, options: PostgresStoreOptions = {}) {
     this.sql = postgres(url, {
-      max: options.max ?? 5, // l'offre gratuite de Supabase limite le nombre de connexions
-      ssl: options.ssl === false ? false : 'require', // chiffrée : le mot de passe ne circule pas en clair
-      prepare: false, // compatible avec le pooler de Supabase en mode « transaction »
+      max: options.max ?? 5,
+      ssl: options.ssl === false ? false : 'require',
+      prepare: false,
       idle_timeout: options.idleTimeout,
       ...(options.maxLifetime ? { max_lifetime: options.maxLifetime } : {}),
-      onnotice: () => {}, // ignore les messages d'information de PostgreSQL (« NOTICE »)
+      onnotice: () => {},
     })
   }
 
@@ -127,19 +107,16 @@ export class PostgresWishlistStore implements WishlistStore {
     return row ? rowToItem(row) : undefined
   }
 
-  /** Ferme les connexions (arrêt propre du serveur). */
   async close(): Promise<void> {
     await this.sql.end({ timeout: 5 })
   }
 
-  // Likes : table pokemon_likes (migration supabase/migrations/001_likes.sql).
   async likes(id: number): Promise<number> {
     const [row] = await this.sql<{ likes: number }[]>`
       select likes from public.pokemon_likes where pokemon_id = ${id}`
     return row?.likes ?? 0
   }
 
-  /** Atomique : insère la ligne au 1er like, sinon incrémente (pas de perte si deux likes arrivent ensemble). */
   async like(id: number): Promise<number> {
     const [row] = await this.sql<{ likes: number }[]>`
       insert into public.pokemon_likes (pokemon_id, likes) values (${id}, 1)

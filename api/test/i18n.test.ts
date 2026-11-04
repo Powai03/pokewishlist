@@ -1,4 +1,3 @@
-// Traduction des messages de l'API : fichiers src/locales/*.json + choix de la langue par requête.
 import { describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.js'
 import { LANGUAGES, translate, type MessageKey } from '../src/i18n.js'
@@ -50,7 +49,6 @@ describe('translate', () => {
 })
 
 describe('langue de la réponse HTTP', () => {
-  /** DELETE d'un Pokémon absent : 404 « pas dans la wishlist », avec les en-têtes donnés. */
   async function notInList(
     path = '/wishlist/495',
     headers: Record<string, string> = {},

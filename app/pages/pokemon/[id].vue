@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// Fiche d'un Pokémon : /pokemon/495 (numéro) ou /pokemon/snivy (nom anglais).
-//
-// Les données sont chargées PAR LE SERVEUR (rendu SSR) : une adresse ouverte directement
-// arrive déjà remplie, et un Pokémon inconnu renvoie un vrai statut HTTP 404 (page d'erreur, error.vue).
-// Textes de l'interface : i18n/locales/*.json ; nom, catégorie et description : PokéAPI, dans les 4 langues.
 import type { PokemonDetails, PokemonStat } from '~/types/pokemon'
 import {
   PokemonNotFoundError,
@@ -17,10 +12,6 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const raw = String(route.params.id)
 
-// Les erreurs portent une CLÉ de traduction (data.i18n), pas une phrase : error.vue la traduit
-// dans la langue affichée, et la retraduit si on change de langue sur la page d'erreur.
-
-// 1. Adresse impossible (n°25, « <script> »…) : 404 tout de suite, sans appeler PokéAPI.
 const param = parsePokemonParam(raw)
 if (!param.ok) {
   throw createError({
@@ -39,7 +30,6 @@ if (!param.ok) {
   })
 }
 
-// 2. Appel à PokéAPI ; un 404 de PokéAPI devient NOTRE 404, une panne devient un 502.
 const pokeapiBase = useRuntimeConfig().public.pokeapiBase
 const { data: pokemon, error } = await useAsyncData<PokemonDetails>(
   `pokemon:${param.value}`,
@@ -72,7 +62,6 @@ if (error.value || !pokemon.value) {
 }
 const p = pokemon.value
 
-// Textes PokéAPI dans la langue affichée (repli : nom de la wishlist, texte « aucune description »).
 const name = computed<string>(
   () => inLocale(p.names, locale.value) ?? pokemonName(p, locale.value),
 )
@@ -84,11 +73,9 @@ const dexNo = (id: number): string => t('app.dexNo', { n: formatDexNumber(id) })
 
 useHead({ title: () => `${name.value} · ${dexNo(p.id)} · PokéWishlist` })
 
-// Pokémon précédent / suivant dans le Pokédex d'Unys (null aux deux bouts).
 const prevId = p.id > GEN5.first ? p.id - 1 : null
 const nextId = p.id < GEN5.last ? p.id + 1 : null
 
-// Barre de statistique : longueur sur 180 (rares sont les stats au-delà), couleur selon la valeur.
 const statWidth = (s: PokemonStat): string =>
   `${Math.min(100, Math.round((s.value / 180) * 100))}%`
 const statClass = (s: PokemonStat): string =>
@@ -101,7 +88,6 @@ const statClass = (s: PokemonStat): string =>
         : 'stat-low'
 const total = p.stats.reduce((sum, s) => sum + s.value, 0)
 
-// Ajout à la wishlist depuis la fiche (même état partagé que la page d'accueil).
 const { ready, error: apiError, full, has, add } = useWishlist()
 const inList = computed<boolean>(() => has(p.id))
 const adding = ref(false)
@@ -110,8 +96,6 @@ async function onAdd(): Promise<void> {
   await add(p)
   adding.value = false
 }
-// Likes de la fiche (API → table pokemon_likes) : chargés dans le navigateur, pour rester à jour
-// même sur une fiche pré-rendue.
 const apiBase = useRuntimeConfig().public.apiBase
 const likes = ref<number | null>(null)
 const liking = ref(false)
@@ -136,7 +120,6 @@ const addLabel = computed<string>(() => {
 
 <template>
   <main class="ds" data-testid="pokemon-sheet">
-    <!-- Écran du haut : l'entrée du Pokédex -->
     <div class="ds-shell ds-top">
       <div class="ds-screen dex">
         <div class="dex-bar">
@@ -154,7 +137,6 @@ const addLabel = computed<string>(() => {
           </div>
           <div class="dex-id">
             <h2 class="dex-name">{{ name }}</h2>
-            <!-- Nom anglais en petit, sauf s'il répète le nom affiché (anglais, espagnol) -->
             <p v-if="p.name !== name.toLowerCase()" class="dex-en">
               {{ p.name }}
             </p>
@@ -185,7 +167,6 @@ const addLabel = computed<string>(() => {
 
     <div class="ds-hinge" aria-hidden="true" />
 
-    <!-- Écran du bas : description, statistiques, actions -->
     <div class="ds-shell ds-bottom">
       <div class="ds-screen touch">
         <p v-if="apiError" class="api-error" role="alert">{{ apiError }}</p>
@@ -264,7 +245,6 @@ const addLabel = computed<string>(() => {
 </template>
 
 <style scoped>
-/* Écran du haut : un Pokédex rouge et blanc, comme celui de Noir et Blanc */
 .dex {
   display: grid;
   gap: 12px;
@@ -363,7 +343,6 @@ const addLabel = computed<string>(() => {
   margin: 0;
 }
 
-/* Écran du bas */
 .dex-text {
   margin: 0;
   padding: 14px 16px;

@@ -1,15 +1,12 @@
-/* Styles communs à toutes les pages (chargés via nuxt.config.ts → css), y compris la page d'erreur. */
 :root {
   --ink: #2b2b2b;
-  --font:
-    'DotGothic16', ui-monospace, monospace; /* police « à points », proche du texte des jeux DS */
+  --font: 'DotGothic16', ui-monospace, monospace;
   --logo: 'Pixelify Sans', var(--font);
   color-scheme: light;
 }
 * {
   box-sizing: border-box;
 }
-/* Noir d'un côté, Blanc de l'autre : les deux versions du jeu */
 html {
   background: linear-gradient(115deg, #141417 0 50%, #ececea 50% 100%);
   min-height: 100%;
@@ -45,7 +42,6 @@ button:disabled {
   padding: 24px 16px 32px;
 }
 
-/* ── Logo : « Poké » en noir sur blanc, « Wishlist » en blanc sur noir ── */
 .logo {
   text-align: center;
   margin-bottom: 18px;
@@ -95,7 +91,6 @@ button:disabled {
   border: 2px solid #ececea;
 }
 
-/* ── La console DS ── */
 .ds {
   display: flex;
   flex-direction: column;
@@ -129,7 +124,6 @@ button:disabled {
   background: #000;
 }
 
-/* Écran tactile : fond sombre à rayures diagonales, comme l'écran du bas en combat */
 .touch {
   display: grid;
   gap: 18px;
@@ -141,7 +135,6 @@ button:disabled {
   );
 }
 
-/* ── Boutons de commande ── */
 .commands {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
@@ -190,7 +183,6 @@ button:disabled {
 .cmd-info {
   background: linear-gradient(#9be07a 0 48%, #3f9a2c 52%);
 }
-/* Un lien (NuxtLink) habillé comme les boutons de commande */
 a.cmd {
   display: grid;
   place-items: center;
@@ -201,7 +193,6 @@ a.cmd {
   opacity: 0.7;
 }
 
-/* Poké Ball dessinée en CSS (utilisée pour marquer les captures) */
 .ball {
   display: inline-block;
   width: 16px;
@@ -228,7 +219,6 @@ a.cmd {
   color: #8edcf8;
 }
 
-/* Écran large : les deux écrans côte à côte, l'écran de combat reste visible pendant le défilement */
 @media (min-width: 1100px) {
   .page {
     max-width: 1240px;

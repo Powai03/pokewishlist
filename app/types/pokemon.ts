@@ -1,7 +1,3 @@
-// Types partagés de l'application : ils décrivent la FORME des données.
-// TypeScript vérifie à la compilation que tout le code les respecte (`npm run typecheck`).
-
-/** Les 18 types élémentaires des Pokémon, tels que PokéAPI les nomme. */
 export const POKEMON_TYPES = [
   'normal',
   'fire',
@@ -23,48 +19,33 @@ export const POKEMON_TYPES = [
   'fairy',
 ] as const
 
-/** Un type élémentaire : uniquement l'une des 18 valeurs ci-dessus (« grass », « fire »…), jamais un texte quelconque. */
 export type PokemonType = (typeof POKEMON_TYPES)[number]
 
-/** Un Pokémon tel qu'on le connaît grâce à PokéAPI : ce sont des données de référence, identiques pour tout le monde. */
 export interface Pokemon {
-  /** Numéro du Pokédex national (494 à 649 pour la 5e génération). */
   id: number
-  /** Nom anglais, tel que renvoyé par PokéAPI (ex. « snivy »). */
   name: string
-  /** Nom français (ex. « Vipélierre »). */
   frName: string
-  /** Sprite animé de Noir et Blanc (écran du haut), ou `null` s'il n'existe pas. */
   sprite: string | null
-  /** Petite icône de menu (boîte du PC), ou `null` si elle n'existe pas. */
   icon: string | null
-  /** Un ou deux types, dans l'ordre du jeu (ex. ['dragon', 'electric'] pour Zekrom). */
   types: PokemonType[]
 }
 
-/** Un Pokémon DANS la wishlist : le Pokémon + ce qui est propre à ma chasse. */
 export interface WishlistItem extends Pokemon {
-  /** `true` une fois le Pokémon capturé dans le jeu. */
   captured: boolean
 }
 
-/** Entrée de l'index de recherche : juste de quoi trouver un Pokémon, sans ses détails. */
 export interface SpeciesEntry {
   id: number
   name: string
-  /** Absent si l'index vient de l'API de secours (noms anglais seulement). */
   frName?: string
 }
 
-/** Progression de la chasse. */
 export interface WishlistStats {
   captured: number
   total: number
-  /** Pourcentage arrondi, de 0 à 100. */
   percent: number
 }
 
-/** Identifiants PokéAPI des 6 statistiques de base, dans l'ordre du jeu. */
 export const STAT_KEYS = [
   'hp',
   'attack',
@@ -75,24 +56,17 @@ export const STAT_KEYS = [
 ] as const
 export type StatKey = (typeof STAT_KEYS)[number]
 
-/** Une statistique de base (PV, Attaque…), de 1 à 255. Son libellé est traduit (clés « stats.hp »…). */
 export interface PokemonStat {
   key: StatKey
   value: number
 }
 
-/** Un texte par langue de l'appli (« en », « fr », « es », « ja ») ; une langue peut manquer. */
 export type LocalizedText = Partial<Record<'en' | 'fr' | 'es' | 'ja', string>>
 
-/** La fiche complète d'un Pokémon (page /pokemon/:id) : le Pokémon + ses informations de Pokédex. */
 export interface PokemonDetails extends Pokemon {
-  /** Nom dans chaque langue fournie par PokéAPI (ex. { en: 'Snivy', fr: 'Vipélierre', ja: 'ツタージャ' }). */
   names: LocalizedText
-  /** Catégorie dans chaque langue (ex. { fr: 'Pokémon Serpenterbe' }). */
   genus: LocalizedText
-  /** Texte du Pokédex dans chaque langue (celui de Noir et Blanc de préférence). */
   description: LocalizedText
-  /** Taille en décimètres et poids en hectogrammes (unités de PokéAPI). */
   height: number
   weight: number
   stats: PokemonStat[]

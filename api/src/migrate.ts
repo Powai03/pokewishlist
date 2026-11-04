@@ -1,8 +1,3 @@
-// Ligne de commande : applique les migrations sur la base de DATABASE_URL (api/.env).
-//
-//   npm run migrate        (depuis api/)
-//
-// Sans risque à relancer : ce qui est déjà appliqué est ignoré (voir migrations.ts).
 import postgres from 'postgres'
 import { runMigrations } from './migrations.js'
 
@@ -13,7 +8,6 @@ if (!url) {
 }
 const { hostname } = new URL(url)
 const local = ['localhost', '127.0.0.1', '::1'].includes(hostname)
-// Seul l'hôte est affiché : jamais le mot de passe contenu dans l'adresse.
 console.info(`Migrations sur ${hostname}`)
 
 const sql = postgres(url, {

@@ -1,13 +1,5 @@
 name: Deploy
 
-# Déploiement de PokéWishlist, pour UN commit donné : API (Lambda), puis site SSR (Vercel) et site SSG
-# (S3 + CloudFront) en parallèle, chacun vérifié en ligne (smoke tests : la CD échoue si une URL critique
-# ne répond pas).
-#
-# Workflow « réutilisable » (workflow_call), appelé par :
-#   · ci.yml       : après un merge sur main, avec le commit du merge ;
-#   · rollback.yml : à la demande, avec une version PRÉCÉDENTE (retour arrière).
-# Un seul code de déploiement : le retour arrière passe exactement par le même chemin qu'une mise en ligne.
 on:
   workflow_call:
     inputs:
@@ -23,7 +15,6 @@ jobs:
   deploy-api:
     name: Deploy API (AWS Lambda)
     runs-on: ubuntu-latest
-    # Environnement GitHub « production » : secrets et variables de déploiement, réservé à la branche main.
     environment:
       name: production
       url: ${{ vars.API_URL }}/health
@@ -31,7 +22,7 @@ jobs:
       group: deploy-production-api
       cancel-in-progress: false
     permissions:
-      id-token: write # demander le jeton OIDC à GitHub (connexion à AWS sans clé)
+      id-token: write
       contents: read
     env:
       DEPLOY_SHA: ${{ inputs.sha }}
@@ -53,14 +44,13 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.sha }} # le commit à déployer (celui du merge, ou une version précédente)
+          ref: ${{ inputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: api/package-lock.json
-      # npm ci (et non le cache du pipeline) : fonctionne aussi pour redéployer un ancien commit.
       - name: npm ci (api)
         run: npm ci
 
@@ -87,12 +77,10 @@ jobs:
             --zip-file fileb://lambda.zip \
             --query '{Version: Version, LastModified: LastModified, CodeSize: CodeSize}' \
             --output table
-          # Attendre que la nouvelle version soit active avant de la tester.
           aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
 
       - name: '[4/4] Vérifier en ligne (API Gateway) : /health = ce commit, /wishlist, CORS'
         run: |
-          # 1. /health renvoie le commit déployé (on réessaie : la nouvelle version peut mettre quelques secondes).
           for i in $(seq 1 10); do
             body=$(curl --silent --show-error --max-time 15 "$API_URL/health" || true)
             commit=$(node -e 'try { console.log(JSON.parse(process.argv[1]).commit) } catch { console.log("") }' "$body")
@@ -106,7 +94,6 @@ jobs:
           fi
           echo "$body"
 
-          # 2. /wishlist répond 200 avec une liste JSON (Supabase joignable depuis Lambda).
           code=$(curl --silent --max-time 15 -o wishlist.json -w '%{http_code}' "$API_URL/wishlist")
           node -e '
             const list = JSON.parse(require("fs").readFileSync("wishlist.json", "utf8"))
@@ -116,7 +103,6 @@ jobs:
             console.log(`GET /wishlist → 200, ${list.length} Pokémon`)
           ' "$code"
 
-          # 3. CORS : la requête préalable du navigateur (OPTIONS) est acceptée pour le front.
           allow=$(curl --silent --max-time 15 -o /dev/null -D - -X OPTIONS "$API_URL/wishlist" \
             -H "Origin: http://localhost:3001" -H "Access-Control-Request-Method: POST" \
             | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin" {print $2}')
@@ -126,9 +112,6 @@ jobs:
           echo "CORS (OPTIONS /wishlist) → autorisé pour http://localhost:3001"
           echo "✔ L'API en ligne exécute le commit $DEPLOY_SHA et ses routes répondent"
 
-  # Version STATIQUE (SSG) du site sur S3 + CloudFront (étapes 12-13 du cours), en parallèle de Vercel.
-  # nuxt generate → aws s3 sync → invalidation du cache CloudFront → vérification en ligne.
-  # Même connexion AWS sans clé (OIDC) ; le rôle ne peut écrire que dans CE bucket et invalider CETTE distribution.
   deploy-ssg:
     name: Deploy SSG (S3 + CloudFront)
     needs: deploy-api
@@ -160,7 +143,7 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.sha }} # le commit à déployer (celui du merge, ou une version précédente)
+          ref: ${{ inputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -173,7 +156,7 @@ jobs:
         env:
           NITRO_PRESET: static
           GIT_COMMIT: ${{ env.DEPLOY_SHA }}
-          NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }} # la même API AWS que le site SSR
+          NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }}
         run: |
           npx nuxt generate
           echo "$(find .output/public -name '*.html' | wc -l) pages HTML générées"
@@ -187,13 +170,11 @@ jobs:
 
       - name: '[3/4] Envoyer sur S3 et invalider le cache CloudFront'
         run: |
-          # Fichiers JS/CSS (nom contenant leur empreinte) : cache d'un an ; HTML et données : toujours revalidés.
           aws s3 sync .output/public "s3://$SSG_BUCKET" --exclude '*' --include '_nuxt/*' \
             --cache-control 'public,max-age=31536000,immutable' --only-show-errors
           aws s3 sync .output/public "s3://$SSG_BUCKET" --exclude '_nuxt/*' \
             --cache-control 'public,max-age=0,must-revalidate' --only-show-errors
-          # Les fichiers des anciennes versions sont retirés seulement maintenant (les pages déjà ouvertes les utilisent encore).
-          aws s3 sync .output/public "s3://$SSG_BUCKET" --delete --only-show-errors
+          aws s3 sync .output/public "s3://$SSG_BUCKET" --delete --exclude 'coverage/*' --only-show-errors
           id=$(aws cloudfront create-invalidation --distribution-id "$SSG_DISTRIBUTION_ID" \
             --paths '/*' --query Invalidation.Id --output text)
           echo "Invalidation $id…"
@@ -209,7 +190,6 @@ jobs:
             sleep 5
           done
           [ "$commit" = "$DEPLOY_SHA" ] || { echo "::error::Le site statique ne porte pas le commit $DEPLOY_SHA"; exit 1; }
-          # Une fiche générée : vrai HTML (pas une coquille vide) et l'adresse de la même API AWS.
           code=$(curl --silent --max-time 20 -o fiche.html -w '%{http_code}' "$SSG_URL/pokemon/snivy")
           if [ "$code" != 200 ] || ! grep -q '<title>Snivy' fiche.html; then
             echo "::error::/pokemon/snivy → $code, sans « Snivy »"; exit 1
@@ -221,8 +201,6 @@ jobs:
           echo "GET /pokemon/snivy → 200 (HTML généré, API $API_URL) ; page absente → 404"
           echo "✔ Le site statique en ligne exécute le commit $DEPLOY_SHA"
 
-  # Front Nuxt (rendu serveur, SSR) sur Vercel, APRÈS l'API (le nouveau front peut avoir besoin de la nouvelle API).
-  # Le déploiement automatique de Vercel à chaque push est coupé (vercel.json) : c'est CE job qui déploie.
   deploy-front:
     name: Deploy (Vercel)
     needs: deploy-api
@@ -237,7 +215,6 @@ jobs:
       DEPLOY_SHA: ${{ inputs.sha }}
       FRONT_URL: ${{ vars.FRONT_URL }}
       API_URL: ${{ vars.API_URL }}
-      # Lus par le CLI Vercel : quel compte, quel projet.
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -253,7 +230,7 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.sha }} # le commit à déployer (celui du merge, ou une version précédente)
+          ref: ${{ inputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -269,8 +246,6 @@ jobs:
         env:
           GIT_COMMIT: ${{ env.DEPLOY_SHA }}
           NUXT_PUBLIC_API_BASE: ${{ vars.API_URL }}
-          # Imposé : dans GitHub Actions, Nitro détecterait la CI et produirait un serveur Node (.output)
-          # au lieu du format Vercel (.vercel/output).
           NITRO_PRESET: vercel
         run: npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
 
@@ -281,7 +256,6 @@ jobs:
 
       - name: '[4/4] Vérifier en ligne : le HTML rendu par le serveur porte ce commit'
         run: |
-          # curl ne lance aucun JavaScript : ce qu'il reçoit est bien le rendu SERVEUR (SSR).
           for i in $(seq 1 10); do
             html=$(curl --silent --max-time 20 "$FRONT_URL/" || true)
             commit=$(printf '%s' "$html" | grep -o '<meta name="app-commit" content="[0-9a-f]*"' | sed 's/.*content="//; s/"$//')
@@ -292,7 +266,6 @@ jobs:
           if [ "$commit" != "$DEPLOY_SHA" ]; then
             echo "::error::Le site en ligne ne porte pas le commit déployé ($DEPLOY_SHA)"; exit 1
           fi
-          # Une fiche rendue par le serveur : données PokéAPI déjà dans le HTML.
           code=$(curl --silent --max-time 20 -o fiche.html -w '%{http_code}' "$FRONT_URL/pokemon/495")
           grep -q 'Snivy' fiche.html || { echo "::error::/pokemon/495 → $code, sans « Snivy » dans le HTML"; exit 1; }
           echo "GET /pokemon/495 → $code, fiche rendue par le serveur"

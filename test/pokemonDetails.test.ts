@@ -1,4 +1,3 @@
-// Fiche d'un Pokémon (page /pokemon/:id) : lecture de l'adresse et chargement depuis PokéAPI (fetch simulé).
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   PokeApiError,
@@ -13,7 +12,6 @@ const json = (status: number, body: unknown): Response =>
     headers: { 'content-type': 'application/json' },
   })
 
-/** Faux `fetch` : répond selon la fin de l'URL, 404 sinon ; enregistre les URL demandées. */
 function mockFetch(routes: Record<string, unknown>): ReturnType<typeof vi.fn> {
   const fake = vi.fn(async (input: RequestInfo | URL): Promise<Response> => {
     const url = String(input)
@@ -28,7 +26,6 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-// Réponses réduites de PokéAPI pour Vipélierre (#495), au format réel.
 const SNIVY = {
   id: 495,
   name: 'snivy',
@@ -36,7 +33,7 @@ const SNIVY = {
   weight: 81,
   types: [{ slot: 1, type: { name: 'grass' } }],
   stats: [
-    { base_stat: 63, stat: { name: 'speed' } }, // volontairement dans le désordre
+    { base_stat: 63, stat: { name: 'speed' } },
     { base_stat: 45, stat: { name: 'hp' } },
     { base_stat: 45, stat: { name: 'attack' } },
     { base_stat: 55, stat: { name: 'defense' } },
@@ -218,7 +215,6 @@ describe('fetchPokemonDetails : un nom passe par l’espèce', () => {
 
   it('espèce dont /pokemon/<nom> n’existe pas (darmanitan) → fiche trouvée par le numéro', async () => {
     mockFetch({
-      // /pokemon/darmanitan absent (404), comme sur le vrai PokéAPI : seule « darmanitan-standard » existe.
       '/pokemon-species/darmanitan': { ...SNIVY_SPECIES, id: 555 },
       '/pokemon/555': { ...SNIVY, id: 555, name: 'darmanitan-standard' },
     })
@@ -243,7 +239,7 @@ describe('fetchPokemonDetails (cas 404)', () => {
     await expect(fetchPokemonDetails('pikachu')).rejects.toBeInstanceOf(
       PokemonNotFoundError,
     )
-    expect(fake).toHaveBeenCalledTimes(1) // pas d'appel inutile à /pokemon/25
+    expect(fake).toHaveBeenCalledTimes(1)
   })
 
   it('PokéAPI en panne (500) → PokeApiError, pas un 404', async () => {

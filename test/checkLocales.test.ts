@@ -1,4 +1,3 @@
-// Le script de vérification des traductions (scripts/check-locales.mjs) : il doit SAVOIR ÉCHOUER.
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -75,7 +74,6 @@ describe('le script en ligne de commande (comme en CI)', () => {
     if (dir) rmSync(dir, { recursive: true, force: true })
   })
 
-  /** Écrit des fichiers de langue dans un dossier temporaire et lance le script dessus. */
   function run(files: Record<string, unknown>): {
     status: number | null
     stdout: string

@@ -1,9 +1,3 @@
-// Smoke test du paquet Lambda SANS AWS : charge dist-lambda/index.mjs et appelle son handler
-// avec un faux événement « Function URL » (GET /health), comme le ferait AWS.
-//
-//   node scripts/invoke-lambda.mjs <commit attendu>
-//
-// Code de sortie 1 si la réponse n'est pas 200, ou si le commit gravé n'est pas celui attendu.
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 

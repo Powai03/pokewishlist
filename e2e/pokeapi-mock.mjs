@@ -1,11 +1,3 @@
-// Faux serveur PokéAPI pour les tests E2E (port 3102 par défaut).
-//
-// Pourquoi un vrai serveur et pas `page.route()` ? La fiche /pokemon/:id est chargée PAR LE SERVEUR NUXT (SSR),
-// pas par le navigateur : Playwright ne voit pas cette requête et ne peut pas la simuler.
-// Le front est donc lancé avec NUXT_PUBLIC_POKEAPI_BASE=http://localhost:3102 pendant les tests.
-//
-// Réponses : Vipélierre (#495 / snivy) en détail, un Pokémon générique pour les autres numéros d'Unys,
-// Pikachu (#25, existe mais hors 5e génération), et 404 pour tout le reste.
 import { createServer } from 'node:http'
 
 const PORT = Number(process.env.PORT ?? 3102)
@@ -29,7 +21,6 @@ const SNIVY = {
   },
   species: {
     id: 495,
-    // Plusieurs langues, comme le vrai PokéAPI : la fiche affiche celle choisie dans le sélecteur.
     names: [
       { name: 'Snivy', language: { name: 'en' } },
       { name: 'Vipélierre', language: { name: 'fr' } },
@@ -55,7 +46,6 @@ const SNIVY = {
   },
 }
 
-/** Un Pokémon d'Unys « générique » (pour naviguer vers les voisins de Vipélierre). */
 function generic(id) {
   return {
     pokemon: {
@@ -76,7 +66,6 @@ const PIKACHU = {
   species: { id: 25, names: [{ name: 'Pikachu', language: { name: 'fr' } }] },
 }
 
-/** Le Pokémon demandé (numéro ou nom), ou undefined → 404. */
 function find(key) {
   if (key === '495' || key === 'snivy') return SNIVY
   if (key === '25' || key === 'pikachu') return PIKACHU
@@ -86,7 +75,6 @@ function find(key) {
 }
 
 const server = createServer((req, res) => {
-  // CORS : en navigation côté navigateur (lien « N°496 »), c'est le navigateur qui appelle ce serveur.
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Content-Type', 'application/json')
   const match = /^\/(pokemon|pokemon-species)\/([^/]+)\/?$/.exec(req.url ?? '')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { WISHLIST_MAX } from '~/utils/wishlist'
 import type { WishlistItem } from '~/types/pokemon'
 
-// La « Boîte » du PC de Noir et Blanc : une grille d'icônes sur un fond d'herbe.
 defineProps<{
   list: WishlistItem[]
   selectedId: number | null
@@ -90,7 +90,6 @@ const nameOf = (p: WishlistItem): string => pokemonName(p, locale.value)
   font-size: 0.85em;
 }
 
-/* Fond « forêt » des boîtes du PC : quadrillage vert */
 .pc-wall {
   min-height: 150px;
   padding: 10px;

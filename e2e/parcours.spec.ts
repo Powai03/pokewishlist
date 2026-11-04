@@ -1,10 +1,3 @@
-// Parcours complets, du navigateur jusqu'à l'API : chaque action faite à l'écran est ensuite vérifiée
-// DANS L'API (requêtes directes), et chaque état de l'API est vérifié À L'ÉCRAN.
-//
-//   navigateur ──▶ front Nuxt (3100) ──fetch──▶ API Hono (3101)        ◀── vérifications directes (request)
-//                    └── fiches en SSR ──▶ faux PokéAPI (3102) ; recherche (navigateur) ──▶ page.route()
-//
-// Parcours : fiche · langues · persistance (2e appareil) · likes (2 visiteurs, fiche pré-rendue, refus serveur).
 import {
   expect,
   test,
@@ -14,7 +7,6 @@ import {
 } from '@playwright/test'
 import { API_URL, FRONT_URL } from '../playwright.config'
 
-// ── Outils ─────────────────────────────────────────────────────────────────────
 interface ApiItem {
   id: number
   captured: boolean
@@ -39,7 +31,6 @@ async function resetWishlist(request: APIRequestContext): Promise<void> {
   }
 }
 
-// PokéAPI côté NAVIGATEUR (recherche + ajout depuis l'accueil) : simulée par page.route().
 const DEX: Record<number, { name: string; fr: string; types: string[] }> = {
   495: { name: 'snivy', fr: 'Vipélierre', types: ['grass'] },
   498: { name: 'tepig', fr: 'Gruikui', types: ['fire'] },
@@ -73,7 +64,6 @@ async function mockBrowserPokeApi(page: Page): Promise<void> {
   })
 }
 
-/** Accueil : cherche un numéro et clique sur le résultat (langue anglaise par défaut). */
 async function addFromSearch(page: Page, id: number): Promise<void> {
   await page.getByLabel('Pokémon name or number').fill(String(id))
   const name = DEX[id]!.name
@@ -84,7 +74,6 @@ async function addFromSearch(page: Page, id: number): Promise<void> {
   await expect(page.getByTestId(`card-${id}`)).toBeVisible()
 }
 
-/** Clique sur « Like » et attend la réponse de l'API ; renvoie le total affiché. */
 async function like(page: Page): Promise<number> {
   const count = page.getByTestId('like-count')
   await expect(count).not.toHaveText('…')
@@ -99,7 +88,6 @@ async function like(page: Page): Promise<number> {
   return before + 1
 }
 
-/** Un « autre appareil » : un navigateur neuf, sans cookie ni état. */
 async function otherDevice(browser: Browser): Promise<Page> {
   const context = await browser.newContext({ baseURL: FRONT_URL })
   const page = await context.newPage()
@@ -112,7 +100,6 @@ test.beforeEach(async ({ page, request }) => {
   await mockBrowserPokeApi(page)
 })
 
-// ── 1. Fiche ──────────────────────────────────────────────────────────────────
 test('fiche : recherche → ajout → fiche → like → retour, chaque étape enregistrée par l’API', async ({
   page,
   request,
@@ -125,20 +112,18 @@ test('fiche : recherche → ajout → fiche → like → retour, chaque étape e
   await expect(page).toHaveURL('/pokemon/495')
   const sheet = page.getByTestId('pokemon-sheet')
   await expect(sheet.getByRole('heading', { name: 'Snivy' })).toBeVisible()
-  // L'état de la wishlist (venu de l'API) est connu de la fiche.
   await expect(
     sheet.getByRole('button', { name: 'In your wishlist' }),
   ).toBeDisabled()
 
   const shown = await like(page)
-  expect(await apiLikes(request, 495)).toBe(shown) // l'écran = l'API
+  expect(await apiLikes(request, 495)).toBe(shown)
 
   await sheet.getByRole('link', { name: 'Back' }).click()
   await expect(page).toHaveURL('/')
   await expect(page.getByTestId('card-495')).toBeVisible()
 })
 
-// ── 2. Langues ────────────────────────────────────────────────────────────────
 test('langues : le choix suit la navigation et le rechargement, et part à l’API (Accept-Language)', async ({
   page,
   request,
@@ -150,19 +135,16 @@ test('langues : le choix suit la navigation et le rechargement, et part à l’A
   await page.getByTestId('lang-select').selectOption('fr')
   await expect(page.locator('html')).toHaveAttribute('lang', 'fr-FR')
 
-  // Navigation vers la fiche : toujours en français, données PokéAPI comprises.
   await page.getByRole('link', { name: 'Fiche de Vipélierre' }).click()
   const sheet = page.getByTestId('pokemon-sheet')
   await expect(sheet.getByRole('heading', { name: 'Vipélierre' })).toBeVisible()
   await expect(sheet.getByText('Statistiques de base')).toBeVisible()
 
-  // Rechargement : la page arrive DÉJÀ en français du serveur (cookie lu en SSR).
   const html = await (await page.request.get('/pokemon/495')).text()
   expect(html).toContain('Statistiques de base')
   await page.reload()
   await expect(sheet.getByText('Statistiques de base')).toBeVisible()
 
-  // Japonais : l'appel à l'API porte la langue choisie.
   await page.getByTestId('lang-select').selectOption('ja')
   await expect(sheet.getByRole('heading', { name: 'ツタージャ' })).toBeVisible()
   const sent = page.waitForRequest(
@@ -171,19 +153,15 @@ test('langues : le choix suit la navigation et le rechargement, et part à l’A
   await like(page)
   expect((await sent).headers()['accept-language']).toBe('ja')
 
-  // Et l'API répond dans cette langue : erreur provoquée depuis l'écran d'accueil.
   await page.goto('/')
-  // Attendre que la liste soit chargée AVANT la suppression : sinon (CI plus lente) la page lirait
-  // une liste déjà vide, sans bouton « Capturer ».
   await expect(page.getByTestId('card-495')).toBeVisible()
-  await request.delete(`${API_URL}/wishlist/495`) // retiré par « un autre client »
+  await request.delete(`${API_URL}/wishlist/495`)
   await page.locator('.cmd-catch').click()
   await expect(page.getByTestId('api-error')).toHaveText(
     'ポケモン #495 はウィッシュリストにありません',
   )
 })
 
-// ── 3. Persistance ────────────────────────────────────────────────────────────
 test('persistance : ajouts, capture et like faits ici sont retrouvés sur un autre appareil', async ({
   page,
   request,
@@ -198,13 +176,11 @@ test('persistance : ajouts, capture et like faits ici sont retrouvés sur un aut
   await page.goto('/pokemon/498')
   const likes498 = await like(page)
 
-  // L'API a tout enregistré.
   expect(await apiWishlist(request)).toEqual([
     expect.objectContaining({ id: 495, captured: true }),
     expect.objectContaining({ id: 498, captured: false }),
   ])
 
-  // Un autre appareil (navigateur neuf) voit exactement le même état, lu dans l'API.
   const other = await otherDevice(browser)
   await other.goto('/')
   await expect(other.getByTestId('card-495')).toBeVisible()
@@ -215,14 +191,12 @@ test('persistance : ajouts, capture et like faits ici sont retrouvés sur un aut
   await other.context().close()
 })
 
-// ── 4. Likes ──────────────────────────────────────────────────────────────────
 test('likes : deux visiteurs sur une fiche PRÉ-RENDUE, les likes s’additionnent dans l’API', async ({
   page,
   request,
   browser,
 }) => {
   const before = await apiLikes(request, 495)
-  // /pokemon/snivy fait partie des 156 fiches générées au build (HTML statique).
   await page.goto('/pokemon/snivy')
   await like(page)
 

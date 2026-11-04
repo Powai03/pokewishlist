@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// Page d'erreur de Nuxt : affichée à la place de toute l'appli (404 Pokémon introuvable, 502 PokéAPI en panne…).
-// Le statut HTTP de la réponse est celui de l'erreur : une adresse inconnue renvoie bien un 404.
-//
-// Traduction : la fiche joint à l'erreur une CLÉ (error.data.i18n = { key, params }) plutôt qu'une phrase ;
-// le texte est donc toujours dans la langue affichée, même si on la change ici.
 import type { NuxtError } from '#app'
 
 const props = defineProps<{ error: NuxtError }>()
@@ -14,10 +9,8 @@ interface ErrorI18n {
   params?: Record<string, string | number>
 }
 
-/** La clé de traduction jointe à l'erreur, si elle existe et est connue. */
 const i18nData = computed<ErrorI18n | null>(() => {
   const data = props.error.data as { i18n?: ErrorI18n } | string | undefined
-  // Rendu côté serveur : `data` peut arriver sérialisé en texte JSON.
   const parsed =
     typeof data === 'string'
       ? (JSON.parse(data) as { i18n?: ErrorI18n } | undefined)
@@ -39,7 +32,6 @@ const message = computed<string>(() =>
 
 useHead({ title: () => `${title.value} · PokéWishlist` })
 
-/** Efface l'erreur et revient à l'accueil. */
 const goHome = (): Promise<void> => clearError({ redirect: '/' })
 </script>
 
@@ -72,7 +64,6 @@ const goHome = (): Promise<void> => clearError({ redirect: '/' })
 
 <style scoped>
 .error-ds {
-  /* Toujours la console « fermée » (un écran au-dessus de l'autre), même sur grand écran */
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -91,7 +82,6 @@ const goHome = (): Promise<void> => clearError({ redirect: '/' })
   border-radius: 8px 8px 22px 22px;
 }
 .touch {
-  /* le bouton prend toute la largeur */
   grid-template-columns: 1fr;
 }
 .error-screen {

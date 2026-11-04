@@ -11,14 +11,12 @@ import {
 
 const API = 'http://api.test'
 
-// Une fausse réponse HTTP (classe Response standard).
 const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json' },
   })
 
-// Remplace `fetch` par un faux qui renvoie toujours `response`, et enregistre les appels.
 function mockFetch(response: () => Response): ReturnType<typeof vi.fn> {
   const fake = vi.fn(async (): Promise<Response> => response())
   vi.stubGlobal('fetch', fake)
@@ -33,7 +31,6 @@ const vipelierre: Pokemon = {
   icon: 'https://img/icons/495.png',
   types: ['grass'],
 }
-// Ce que l'API renvoie pour Vipélierre (avec captured et addedAt en plus).
 const fromApi = {
   ...vipelierre,
   captured: false,
@@ -164,8 +161,8 @@ describe('parseWishlistItems (vérification des réponses de l’API)', () => {
       { ...fromApi, id: 498, name: 'tepig', frName: 'Gruikui', captured: true },
       null,
       { id: 'x', name: 'zorua' },
-      { id: 25, name: 'pikachu' }, // hors 5e génération
-      { ...fromApi, types: ['grass', 'plante'] }, // type inconnu écarté
+      { id: 25, name: 'pikachu' },
+      { ...fromApi, types: ['grass', 'plante'] },
     ])
     expect(list.map((p) => p.id)).toEqual([495, 498])
     expect(list[0]?.types).toEqual(['grass'])
@@ -174,7 +171,6 @@ describe('parseWishlistItems (vérification des réponses de l’API)', () => {
 })
 
 describe('langue : en-tête Accept-Language et erreurs à traduire', () => {
-  /** En-têtes envoyés lors du 1er appel au faux `fetch`. */
   const sentHeaders = (fake: ReturnType<typeof vi.fn>): Headers =>
     new Headers((fake.mock.calls[0]?.[1] as RequestInit | undefined)?.headers)
 

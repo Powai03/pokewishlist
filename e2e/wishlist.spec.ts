@@ -1,11 +1,3 @@
-// Tests de bout en bout « full-stack » : playwright.config.ts démarre la VRAIE API Hono (port 3101)
-// et le VRAI front Nuxt (port 3100). Seule PokéAPI (service externe) est simulée.
-//
-// Organisation : ajout · doublon · limite de 6 · suppression · capture · robustesse.
-// Pour le doublon et la limite, deux niveaux sont vérifiés :
-//   - l'INTERFACE empêche l'action (bouton désactivé) ;
-//   - le SERVEUR la refuse aussi (409) quand l'interface n'est pas à jour
-//     (un autre client a modifié l'API entre-temps) : la règle ne repose pas que sur le front.
 import {
   expect,
   test,
@@ -15,7 +7,6 @@ import {
 } from '@playwright/test'
 import { API_URL, FRONT_URL } from '../playwright.config'
 
-// ── Fausses réponses PokéAPI : 7 Pokémon d'Unys (de quoi dépasser la limite de 6) ──
 const POKEMON: Record<number, { name: string; fr: string; types: string[] }> = {
   495: { name: 'snivy', fr: 'Vipélierre', types: ['grass'] },
   498: { name: 'tepig', fr: 'Gruikui', types: ['fire'] },
@@ -26,7 +17,7 @@ const POKEMON: Record<number, { name: string; fr: string; types: string[] }> = {
   644: { name: 'zekrom', fr: 'Zekrom', types: ['dragon', 'electric'] },
 }
 const IDS = Object.keys(POKEMON).map(Number)
-const SIX = IDS.slice(0, 6) // 495 … 633
+const SIX = IDS.slice(0, 6)
 const SEVENTH = 644
 
 async function mockPokeApi(page: Page): Promise<void> {
@@ -58,7 +49,6 @@ async function mockPokeApi(page: Page): Promise<void> {
   })
 }
 
-// ── Outils pour parler directement à l'API (sans passer par le front) ─────────
 interface ApiItem {
   id: number
   frName: string
@@ -69,7 +59,6 @@ async function apiWishlist(request: APIRequestContext): Promise<ApiItem[]> {
   return (await (await request.get(`${API_URL}/wishlist`)).json()) as ApiItem[]
 }
 
-/** Ajoute un Pokémon directement dans l'API, comme le ferait un autre client (autre onglet, autre appareil). */
 async function apiAdd(request: APIRequestContext, id: number): Promise<number> {
   const p = POKEMON[id]!
   const res = await request.post(`${API_URL}/wishlist`, {
@@ -78,21 +67,18 @@ async function apiAdd(request: APIRequestContext, id: number): Promise<number> {
   return res.status()
 }
 
-/** Vide la wishlist de l'API (en mémoire, partagée entre les tests). */
 async function resetApi(request: APIRequestContext): Promise<void> {
   for (const item of await apiWishlist(request)) {
     await request.delete(`${API_URL}/wishlist/${item.id}`)
   }
 }
 
-/** Le bouton d'un Pokémon dans la liste des RÉSULTATS du Pokédex (pas dans la boîte). */
 function searchResult(page: Page, frName: string | RegExp): Locator {
   return page
     .getByRole('list', { name: 'Résultats de recherche' })
     .getByRole('button', { name: frName })
 }
 
-/** Dans le front : cherche un Pokémon par son numéro et clique sur « Ajouter ». */
 async function addFromUi(page: Page, id: number): Promise<void> {
   await page.getByLabel('Nom ou numéro').fill(String(id))
   await searchResult(page, new RegExp(POKEMON[id]!.fr)).click()
@@ -101,8 +87,6 @@ async function addFromUi(page: Page, id: number): Promise<void> {
 const ids = async (request: APIRequestContext): Promise<number[]> =>
   (await apiWishlist(request)).map((p) => p.id)
 
-// Ces tests vérifient l'interface EN FRANÇAIS : on choisit le français comme le ferait le sélecteur
-// de langue (cookie « lang »). L'anglais par défaut et le changement de langue : voir i18n.spec.ts.
 test.beforeEach(async ({ context, page, request }) => {
   await context.addCookies([{ name: 'lang', value: 'fr', url: FRONT_URL }])
   await resetApi(request)
@@ -111,7 +95,6 @@ test.beforeEach(async ({ context, page, request }) => {
   await expect(page.getByText('Ta boîte est vide')).toBeVisible()
 })
 
-// ── Ajout ─────────────────────────────────────────────────────────────────────
 test.describe('ajout', () => {
   test("ajouter depuis Nuxt : le Pokémon apparaît dans l'API (GET /wishlist)", async ({
     page,
@@ -119,7 +102,7 @@ test.describe('ajout', () => {
   }) => {
     expect(await apiWishlist(request)).toEqual([])
 
-    await page.getByLabel('Nom ou numéro').fill('vipe') // recherche en français, sans accent
+    await page.getByLabel('Nom ou numéro').fill('vipe')
     await searchResult(page, /Vipélierre/).click()
 
     await expect(page.getByTestId('card-495')).toBeVisible()
@@ -155,7 +138,6 @@ test.describe('ajout', () => {
   })
 })
 
-// ── Doublon ───────────────────────────────────────────────────────────────────
 test.describe('doublon', () => {
   test('interface : un Pokémon déjà dans la boîte ne peut pas être ré-ajouté', async ({
     page,
@@ -176,7 +158,6 @@ test.describe('doublon', () => {
     page,
     request,
   }) => {
-    // Un autre client ajoute Vipélierre ; ce front-ci ne le sait pas encore (liste affichée vide).
     expect(await apiAdd(request, 495)).toBe(201)
 
     await addFromUi(page, 495)
@@ -184,11 +165,10 @@ test.describe('doublon', () => {
     await expect(page.getByTestId('api-error')).toContainText(
       'déjà dans la wishlist',
     )
-    expect(await ids(request)).toEqual([495]) // toujours un seul exemplaire côté serveur
+    expect(await ids(request)).toEqual([495])
   })
 })
 
-// ── Limite de 6 ───────────────────────────────────────────────────────────────
 test.describe('limite de 6 Pokémon', () => {
   test('interface : après 6 ajouts, le 7e est bloqué et l’API en contient 6', async ({
     page,
@@ -212,7 +192,6 @@ test.describe('limite de 6 Pokémon', () => {
     page,
     request,
   }) => {
-    // Un autre client remplit la liste ; ce front-ci l'affiche encore vide.
     for (const id of SIX) expect(await apiAdd(request, id)).toBe(201)
 
     await addFromUi(page, SEVENTH)
@@ -222,18 +201,17 @@ test.describe('limite de 6 Pokémon', () => {
   })
 })
 
-// ── Suppression ───────────────────────────────────────────────────────────────
 test.describe('suppression', () => {
   test('retirer depuis Nuxt : le Pokémon disparaît de l’écran et de l’API', async ({
     page,
     request,
   }) => {
     await addFromUi(page, 498)
-    await expect(page.getByTestId('card-498')).toBeVisible() // attendre la fin de l'ajout
+    await expect(page.getByTestId('card-498')).toBeVisible()
     await addFromUi(page, 501)
     await expect(page.locator('[data-testid^="card-"]')).toHaveCount(2)
 
-    await page.getByTestId('card-498').getByRole('button').click() // sélectionne Gruikui
+    await page.getByTestId('card-498').getByRole('button').click()
     await page.getByRole('button', { name: 'Retirer Gruikui' }).click()
 
     await expect(page.getByTestId('card-498')).toHaveCount(0)
@@ -269,7 +247,7 @@ test.describe('suppression', () => {
   }) => {
     await addFromUi(page, 495)
     await expect(page.getByTestId('card-495')).toBeVisible()
-    await request.delete(`${API_URL}/wishlist/495`) // retiré ailleurs
+    await request.delete(`${API_URL}/wishlist/495`)
 
     await page.getByRole('button', { name: 'Retirer Vipélierre' }).click()
 
@@ -278,13 +256,12 @@ test.describe('suppression', () => {
   })
 })
 
-// ── Capture ───────────────────────────────────────────────────────────────────
 test('capturer depuis Nuxt : PATCH envoyé, l’état est enregistré par l’API', async ({
   page,
   request,
 }) => {
   await page.getByLabel('Nom ou numéro').fill('moustillon')
-  await page.keyboard.press('Enter') // Entrée ajoute le premier résultat
+  await page.keyboard.press('Enter')
   await expect(page.getByTestId('card-501')).toBeVisible()
 
   await page.getByRole('button', { name: 'Capturer' }).click()
@@ -295,7 +272,6 @@ test('capturer depuis Nuxt : PATCH envoyé, l’état est enregistré par l’AP
     .toBe(true)
 })
 
-// ── Robustesse ────────────────────────────────────────────────────────────────
 test("API injoignable : message d'erreur, l'application ne plante pas", async ({
   page,
 }) => {
@@ -312,15 +288,11 @@ test("API injoignable : message d'erreur, l'application ne plante pas", async ({
   expect(pageErrors).toEqual([])
 })
 
-// ── CORS, dans un VRAI navigateur sans interception ───────────────────────────
-// Attention : dès qu'un test utilise `page.route()` (ici pour simuler PokéAPI), Playwright répond
-// lui-même aux requêtes CORS préalables (« preflight ») : les tests ci-dessus ne voient donc PAS
-// les erreurs CORS. Ce test utilise un contexte neuf, SANS aucune route, comme un vrai utilisateur.
 test('CORS : depuis la page du front, le navigateur peut appeler GET, POST, PATCH et DELETE', async ({
   browser,
   baseURL,
 }) => {
-  const context = await browser.newContext() // aucun page.route() ici
+  const context = await browser.newContext()
   const page = await context.newPage()
   await page.goto(baseURL!)
 

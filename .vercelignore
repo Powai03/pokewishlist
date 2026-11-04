@@ -1,6 +1,3 @@
-# Fichiers envoyés à Vercel : seulement le front Nuxt.
-# Sans cette liste, Vercel prend le dossier api/ (notre API Hono, déployée sur AWS Lambda) pour des
-# « fonctions Vercel » : un fichier = une fonction, bien au-delà de la limite de 12 de l'offre gratuite.
 /api
 /infra
 /supabase

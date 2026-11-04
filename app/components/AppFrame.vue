@@ -1,14 +1,9 @@
 <script setup lang="ts">
-// Le cadre commun à toutes les pages : logo (lien vers l'accueil), sélecteur de langue, contenu, pied de page.
-// Utilisé par app.vue ET par error.vue (la page d'erreur remplace app.vue entièrement).
 const { t, localeProperties } = useI18n()
-// Version en ligne : le commit gravé au build (« local » en développement).
 const commit = useRuntimeConfig().public.commit
 
 useHead({
-  // <html lang="…"> suit la langue choisie (lecteurs d'écran, traduction automatique, moteurs de recherche).
   htmlAttrs: { lang: () => localeProperties.value.language ?? 'en' },
-  // Lu par le CD (curl du HTML rendu par le serveur) pour vérifier que la mise en ligne a eu lieu.
   meta: [{ name: 'app-commit', content: commit }],
   link: [
     { rel: 'preconnect', href: 'https://fonts.googleapis.com' },

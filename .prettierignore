@@ -1,4 +1,2 @@
-# Prettier ignore déjà ce qui est dans .gitignore (node_modules, .nuxt, .output…)
 package-lock.json
-# L'API (api/) a son propre Prettier : voir api/.prettierrc.json.
 api/

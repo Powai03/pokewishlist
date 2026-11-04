@@ -1,6 +1,3 @@
-// Tests d'INTÉGRATION : le vrai stockage PostgreSQL sur une vraie base (aucun mock SQL).
-// Chaque test part d'une table vide (`clean` avant chaque test) et la base est vidée à la fin.
-// On vérifie à la fois ce que renvoie l'API ET ce qui est réellement écrit dans la table.
 import type { Hono } from 'hono'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../../src/app.js'
@@ -12,7 +9,6 @@ import {
   type TestDatabase,
 } from './test-database.js'
 
-/** true en CI (TEST_DATABASE_URL → serveur PostgreSQL 17) ; false en local (PGlite). */
 const REAL_SERVER = Boolean(process.env.TEST_DATABASE_URL?.trim())
 
 let db: TestDatabase
@@ -34,7 +30,6 @@ afterAll(async () => {
   await db?.stop()
 })
 
-/** Pokémon de 5e génération utilisés dans les tests. */
 const pokemon = (id: number, types: string[] = ['grass']): WishlistInput => ({
   id,
   name: `pokemon-${id}`,
@@ -45,7 +40,6 @@ const pokemon = (id: number, types: string[] = ['grass']): WishlistInput => ({
 })
 const SIX = [495, 498, 501, 570, 610, 633]
 
-/** Ce qui est VRAIMENT dans la table, lu sans passer par le code testé. */
 async function rowsInDb(): Promise<{ id: number; captured: boolean }[]> {
   return db.sql<{ id: number; captured: boolean }[]>`
     select id, captured from public.wishlist order by id`
@@ -226,8 +220,6 @@ describe('limite de 6', () => {
     expect(await rowsInDb()).toHaveLength(6)
   })
 
-  // Uniquement sur un vrai serveur PostgreSQL (CI) : PGlite n'a qu'un moteur pour toutes les connexions
-  // et mélange les requêtes envoyées en même temps ; ce test n'y aurait aucun sens.
   it.runIf(REAL_SERVER)(
     '10 ajouts SIMULTANÉS : exactement 6 acceptés (verrou du déclencheur) [vrai PostgreSQL]',
     async () => {

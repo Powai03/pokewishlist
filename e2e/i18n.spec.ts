@@ -1,5 +1,3 @@
-// Traduction (i18n) de bout en bout : anglais par défaut, sélecteur de langue, langue mémorisée,
-// et messages de l'API Hono traduits dans la langue choisie (en-tête Accept-Language envoyé par le front).
 import {
   expect,
   test,
@@ -15,7 +13,6 @@ async function resetApi(request: APIRequestContext): Promise<void> {
   for (const { id } of items) await request.delete(`${API_URL}/wishlist/${id}`)
 }
 
-/** Index de recherche (PokéAPI GraphQL) simulé : la page d'accueil le charge au démarrage. */
 async function mockSearchIndex(page: Page): Promise<void> {
   await page.route('https://beta.pokeapi.co/graphql/**', (route) =>
     route.fulfill({
@@ -39,7 +36,6 @@ test.beforeEach(async ({ page, request }) => {
 })
 
 test.describe('anglais par défaut', () => {
-  // Navigateur réglé en français : l'anglais reste la langue par défaut (choix du projet).
   test.use({ locale: 'fr-FR' })
 
   test('première visite → interface en anglais, <html lang="en-US">', async ({
@@ -140,13 +136,11 @@ test.describe('messages de l’API Hono', () => {
     page,
     request,
   }) => {
-    // Vipélierre est dans la wishlist à l'ouverture de la page…
     await request.post(`${API_URL}/wishlist`, {
       data: { id: 495, name: 'snivy', frName: 'Vipélierre', types: ['grass'] },
     })
     await page.goto('/')
     await expect(page.getByTestId('card-495')).toBeVisible()
-    // … puis un autre client le retire : « Capturer » provoquera un 404 de l'API.
     await request.delete(`${API_URL}/wishlist/495`)
 
     const apiError = page.getByTestId('api-error')
@@ -164,9 +158,7 @@ test.describe('messages de l’API Hono', () => {
           r.url().endsWith('/wishlist/495') && r.request().method() === 'PATCH',
       )
       await catchButton.click()
-      // La requête du front porte la langue choisie…
       expect((await response).request().headers()['accept-language']).toBe(code)
-      // … et le message affiché est celui de l'API, dans cette langue.
       await expect(apiError).toHaveText(message)
     }
   })
@@ -185,6 +177,6 @@ test.describe('messages de l’API Hono', () => {
       expect(body.code).toBe('notInList')
       messages[lang] = body.error
     }
-    expect(new Set(Object.values(messages)).size).toBe(4) // 4 textes différents
+    expect(new Set(Object.values(messages)).size).toBe(4)
   })
 })
